@@ -49,7 +49,7 @@
 #include "mdp.h"
 #include "mdp4.h"
 #include <mach/board_lge.h>
-#include <../../char/diag/mtsk_tty.h>
+#include "../../char/diag/mtsk_tty.h"
 
 /*           
                                  
