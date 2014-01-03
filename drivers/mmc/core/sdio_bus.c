@@ -317,6 +317,11 @@ int sdio_add_func(struct sdio_func *func)
 	if (ret == 0)
 		sdio_func_set_present(func);
 
+//                                                                             
+#if defined(CONFIG_MACH_LGE_L9II_COMMON)
+	printk("[%s] %s:%d (ret=%d)\n", __func__, mmc_card_id(func->card), func->num, ret);
+#endif
+//                                                                             
 	return ret;
 }
 

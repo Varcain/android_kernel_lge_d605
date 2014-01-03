@@ -692,7 +692,7 @@ static void paint_it(struct kmemleak_object *object, int color)
 	spin_unlock_irqrestore(&object->lock, flags);
 }
 
-static void paint_ptr(unsigned long ptr, int color)
+static int paint_ptr(unsigned long ptr, int color)
 {
 	struct kmemleak_object *object;
 
@@ -702,28 +702,29 @@ static void paint_ptr(unsigned long ptr, int color)
 			      "at 0x%08lx as %s\n", ptr,
 			      (color == KMEMLEAK_GREY) ? "Grey" :
 			      (color == KMEMLEAK_BLACK) ? "Black" : "Unknown");
-		return;
+		return -1;
 	}
 	paint_it(object, color);
 	put_object(object);
+	return 0;
 }
 
 /*
  * Mark an object permanently as gray-colored so that it can no longer be
  * reported as a leak. This is used in general to mark a false positive.
  */
-static void make_gray_object(unsigned long ptr)
+static int make_gray_object(unsigned long ptr)
 {
-	paint_ptr(ptr, KMEMLEAK_GREY);
+	return paint_ptr(ptr, KMEMLEAK_GREY);
 }
 
 /*
  * Mark the object as black-colored so that it is ignored from scans and
  * reporting.
  */
-static void make_black_object(unsigned long ptr)
+static int make_black_object(unsigned long ptr)
 {
-	paint_ptr(ptr, KMEMLEAK_BLACK);
+	return paint_ptr(ptr, KMEMLEAK_BLACK);
 }
 
 /*
@@ -990,14 +991,20 @@ EXPORT_SYMBOL_GPL(kmemleak_free_percpu);
  * Calling this function on an object will cause the memory block to no longer
  * be reported as leak and always be scanned.
  */
-void __ref kmemleak_not_leak(const void *ptr)
+static int __ref __kmemleak_not_leak(const void *ptr)
 {
 	pr_debug("%s(0x%p)\n", __func__, ptr);
 
 	if (atomic_read(&kmemleak_enabled) && ptr && !IS_ERR(ptr))
-		make_gray_object((unsigned long)ptr);
+		return make_gray_object((unsigned long)ptr);
 	else if (atomic_read(&kmemleak_early_log))
 		log_early(KMEMLEAK_NOT_LEAK, ptr, 0, 0);
+	return 0;
+}
+
+void __ref kmemleak_not_leak(const void *ptr)
+{
+	__kmemleak_not_leak(ptr);
 }
 EXPORT_SYMBOL(kmemleak_not_leak);
 
@@ -1010,14 +1017,19 @@ EXPORT_SYMBOL(kmemleak_not_leak);
  * it is known that the corresponding block is not a leak and does not contain
  * any references to other allocated memory blocks.
  */
-void __ref kmemleak_ignore(const void *ptr)
+static int __ref __kmemleak_ignore(const void *ptr)
 {
 	pr_debug("%s(0x%p)\n", __func__, ptr);
 
 	if (atomic_read(&kmemleak_enabled) && ptr && !IS_ERR(ptr))
-		make_black_object((unsigned long)ptr);
+		return make_black_object((unsigned long)ptr);
 	else if (atomic_read(&kmemleak_early_log))
 		log_early(KMEMLEAK_IGNORE, ptr, 0, 0);
+	return 0;
+}
+void __ref kmemleak_ignore(const void *ptr)
+{
+	__kmemleak_ignore(ptr);
 }
 EXPORT_SYMBOL(kmemleak_ignore);
 
@@ -1736,6 +1748,17 @@ static int kmemleak_boot_config(char *str)
 }
 early_param("kmemleak", kmemleak_boot_config);
 
+static void __init print_log_stack(struct early_log *log)
+{
+	struct stack_trace trace;
+
+	trace.nr_entries = log->trace_len;
+	trace.entries = log->trace;
+
+	pr_notice(" object backtrace:");
+	print_stack_trace(&trace, 4);
+}
+
 static void __init print_log_trace(struct early_log *log)
 {
 	struct stack_trace trace;
@@ -1809,10 +1832,12 @@ void __init kmemleak_init(void)
 			kmemleak_free_percpu(log->ptr);
 			break;
 		case KMEMLEAK_NOT_LEAK:
-			kmemleak_not_leak(log->ptr);
+			if (__kmemleak_not_leak(log->ptr) < 0)
+				print_log_stack(log);
 			break;
 		case KMEMLEAK_IGNORE:
-			kmemleak_ignore(log->ptr);
+			if (__kmemleak_ignore(log->ptr) < 0)
+				print_log_stack(log);
 			break;
 		case KMEMLEAK_SCAN_AREA:
 			kmemleak_scan_area(log->ptr, log->size, GFP_KERNEL);

@@ -21,6 +21,178 @@
 DEFINE_MUTEX(s5k4e1_mut);
 static struct msm_sensor_ctrl_t s5k4e1_s_ctrl;
 
+#ifdef CONFIG_MACH_LGE
+static struct msm_camera_i2c_reg_conf s5k4e1_start_settings[] = {
+	{0x0100, 0x01},
+};
+
+static struct msm_camera_i2c_reg_conf s5k4e1_stop_settings[] = {
+	{0x0100, 0x00},
+	{0x3030, 0x06},/* shut streaming off */
+};
+
+static struct msm_camera_i2c_reg_conf s5k4e1_groupon_settings[] = {
+	{0x0104, 0x01},
+};
+
+static struct msm_camera_i2c_reg_conf s5k4e1_groupoff_settings[] = {
+	{0x0104, 0x00},
+};
+
+static struct msm_camera_i2c_reg_conf s5k4e1_prev_settings[] = {
+	{0x301B, 0x83},/* CDS option setting */
+	{0x30BC, 0xB0},/*                                                       */
+	/* PLL setting ... */
+	/* (3) MIPI 2-lane Serial(TST = 0000b or TST = 0010b), 30 fps */
+	{0x0305, 0x06},/* PLL P = 6 */
+	{0x0306, 0x00},/* PLL M[8] = 0 */
+	{0x0307, 0x32},
+	{0x30B5, 0x00},
+	{0x30E2, 0x02},
+	{0x30F1, 0x70},
+	/* output size (1304 x 980) */
+	{0x30A9, 0x02},/* Horizontal Binning On */
+	{0x300E, 0xEB},/* Vertical Binning On */
+	{0x0387, 0x03},/* y_odd_inc 03(10b AVG) */
+	{0x0344, 0x00},/* x_addr_start 0 */
+	{0x0345, 0x00},
+	{0x0348, 0x0A},/* x_addr_end 2607 */
+	{0x0349, 0x2F},
+	{0x0346, 0x00},/* y_addr_start 0 */
+	{0x0347, 0x00},
+	{0x034A, 0x07},/* y_addr_end 1959 */
+	{0x034B, 0xA7},
+	{0x0380, 0x00},/* x_even_inc 1 */
+	{0x0381, 0x01},
+	{0x0382, 0x00},/* x_odd_inc 1 */
+	{0x0383, 0x01},
+	{0x0384, 0x00},/* y_even_inc 1 */
+	{0x0385, 0x01},
+	{0x0386, 0x00},/* y_odd_inc 3 */
+	{0x0387, 0x03},
+	{0x034C, 0x05},/* x_output_size 1304 */
+	{0x034D, 0x18},
+	{0x034E, 0x03},/* y_output_size 980 */
+	{0x034F, 0xd4},
+	{0x30BF, 0xAB},/* outif_enable[7], data_type[5:0](2Bh = bayer 10bit} */
+	{0x30C0, 0xA0},/* video_offset[7:4] 3260%12 */
+	{0x30C8, 0x06},/* video_data_length 1600 = 1304 * 1.25 */
+	{0x30C9, 0x5E},
+	/* Timing Configuration */
+	{0x0202, 0x04},/* coarse integration time */
+	{0x0203, 0x5A},
+	{0x0204, 0x00},/* analog gain[msb] */
+	{0x0205, 0x22},/* analog gain[lsb] */
+	{0x0340, 0x03},/* Frame Length */
+	{0x0341, 0xE0},
+	{0x0342, 0x0A},/* 2738  Line Length */
+	{0x0343, 0xB2},
+};
+
+static struct msm_camera_i2c_reg_conf s5k4e1_snap_settings[] = {
+	{0x301B, 0x75},/* CDS option setting */
+	{0x30BC, 0xB0},/*                                                       */
+	/* PLL setting ... */
+	/* (3) MIPI 2-lane Serial(TST = 0000b or TST = 0010b), 30 fps */
+	{0x0305, 0x06},/* PLL P = 6 */
+	{0x0306, 0x00},/* PLL M[8] = 0 */
+	{0x0307, 0x32},
+	{0x30B5, 0x00},
+	{0x30E2, 0x02},
+	{0x30F1, 0x70},
+	/*Output Size (2608x1960)*/
+	{0x30A9, 0x03},/* Horizontal Binning Off */
+	{0x300E, 0xE8},/* Vertical Binning Off */
+	{0x0387, 0x01},/* y_odd_inc */
+	{0x034C, 0x0A},/* x_output size */
+	{0x034D, 0x30},
+	{0x034E, 0x07},/* y_output size */
+	{0x034F, 0xA8},
+	{0x30BF, 0xAB},/* outif_enable[7], data_type[5:0](2Bh = bayer 10bit} */
+	{0x30C0, 0x80},/* video_offset[7:4] 3260%12 */
+	{0x30C8, 0x0C},/* video_data_length 3260 = 2608 * 1.25 */
+	{0x30C9, 0xBC},
+	/*Timing configuration*/
+	{0x0202, 0x04},/* coarse integration time */
+	{0x0203, 0x5A},
+	{0x0204, 0x00},/* analog gain[msb] */
+	{0x0205, 0x44},/* analog gain[lsb] */
+	{0x0340, 0x07},/* Frame Length */
+	{0x0341, 0xB4},
+	{0x0342, 0x0A},/* 2738 Line Length */
+	{0x0343, 0xB2},
+};
+
+static struct msm_camera_i2c_reg_conf s5k4e1_recommend_settings[] = {
+	/* Reset setting */
+	{0x0103, 0x01},
+	/* MIPI settings */
+	{0x30BD, 0x00},
+	{0x3084, 0x15},
+	{0x30BE, 0x15},
+	{0x30C1, 0x01},
+	{0x30EE, 0x02},
+	{0x3111, 0x86},
+
+	/* REC Settings */
+	/*CDS timing setting ... */
+	{0x3000, 0x05},
+	{0x3001, 0x03},
+	{0x3002, 0x08},
+	{0x3003, 0x09},
+	{0x3004, 0x2E},
+	{0x3005, 0x06},
+	{0x3006, 0x34},
+	{0x3007, 0x00},
+	{0x3008, 0x3C},
+	{0x3009, 0x3C},
+	{0x300A, 0x28},
+	{0x300B, 0x04},
+	{0x300C, 0x0A},
+	{0x300D, 0x02},
+	{0x300F, 0x82},
+	/* CDS option setting ... */
+	{0x3010, 0x00},
+	{0x3011, 0x4C},
+	{0x3012, 0x30},
+	{0x3013, 0xC0},
+	{0x3014, 0x00},
+	{0x3015, 0x00},
+	{0x3016, 0x2C},
+	{0x3017, 0x94},
+	{0x3018, 0x78},
+	{0x301B, 0x83},
+	{0x301D, 0xD4},
+	{0x3021, 0x02},
+	{0x3022, 0x24},
+	{0x3024, 0x40},
+	{0x3027, 0x08},
+
+	/* Pixel option setting ...   */
+	{0x301C, 0x04},
+	{0x30D8, 0x3F},
+	{0x302B, 0x01},
+
+	{0x3070, 0x5F},
+	{0x3071, 0x00},
+	{0x3080, 0x04},
+	{0x3081, 0x38},
+#if defined(CONFIG_MACH_MSM8930_LGPS9) || defined(CONFIG_MACH_MSM8930_FX3)
+	/* H-V flip */
+	{0x0101, 0x00},
+#endif
+
+	/* PLL settings */
+	{0x0305, 0x04},
+	{0x0306, 0x00},
+	{0x0307, 0x44},
+	{0x30B5, 0x00},
+	{0x30E2, 0x02},/* num lanes[1:0] = 2 */
+	{0x30F1, 0xB0},
+};
+
+#else /* qualcomm original */
+
 static struct msm_camera_i2c_reg_conf s5k4e1_start_settings[] = {
 	{0x0100, 0x01},
 };
@@ -168,9 +340,15 @@ static struct msm_camera_i2c_reg_conf s5k4e1_recommend_settings[] = {
 	{0x30F1, 0xB0},
 };
 
+#endif
+
 static struct v4l2_subdev_info s5k4e1_subdev_info[] = {
 	{
+#ifdef CONFIG_MACH_LGE
+	.code   = V4L2_MBUS_FMT_SBGGR10_1X10,
+#else
 	.code   = V4L2_MBUS_FMT_SGRBG10_1X10,
+#endif
 	.colorspace = V4L2_COLORSPACE_JPEG,
 	.fmt    = 1,
 	.order    = 0,
@@ -210,6 +388,46 @@ static struct msm_sensor_output_info_t s5k4e1_dimensions[] = {
 		.binning_factor = 1,
 	},
 };
+
+static struct msm_camera_csi_params s5k4e1_csi_params = {
+	.data_format = CSI_10BIT,
+	.lane_cnt    = 1,
+	.lane_assign = 0xe4,
+	.dpcm_scheme = 0,
+	.settle_cnt  = 24,
+};
+
+static struct msm_camera_csi_params *s5k4e1_csi_params_array[] = {
+	&s5k4e1_csi_params,
+	&s5k4e1_csi_params,
+};
+
+#ifdef CONFIG_MACH_LGE
+static struct msm_camera_csid_vc_cfg s5k4e1_cid_cfg[] = {
+	{0, CSI_RAW10, CSI_DECODE_10BIT},
+	{1, CSI_EMBED_DATA, CSI_DECODE_8BIT},
+};
+
+static struct msm_camera_csi2_params s5k4e1_csi2_params = {
+	.csid_params = {
+		.lane_assign = 0xe4,
+		.lane_cnt = 2,
+		.lut_params = {
+			.num_cid = ARRAY_SIZE(s5k4e1_cid_cfg),
+			.vc_cfg = s5k4e1_cid_cfg,
+		},
+	},
+	.csiphy_params = {
+		.lane_cnt = 2,
+		.settle_cnt = 0x18,
+	},
+};
+
+static struct msm_camera_csi2_params *s5k4e1_csi2_params_array[] = {
+	&s5k4e1_csi2_params,
+	&s5k4e1_csi2_params,
+};
+#endif
 
 static struct msm_sensor_output_reg_addr_t s5k4e1_reg_addr = {
 	.x_output = 0x034C,
@@ -467,6 +685,9 @@ static struct msm_sensor_fn_t s5k4e1_func_tbl = {
 	.sensor_set_fps = msm_sensor_set_fps,
 	.sensor_write_exp_gain = s5k4e1_write_prev_exp_gain,
 	.sensor_write_snapshot_exp_gain = s5k4e1_write_pict_exp_gain,
+#ifdef CONFIG_MACH_LGE
+	.sensor_setting = msm_sensor_setting,
+#endif
 	.sensor_csi_setting = msm_sensor_setting1,
 	.sensor_set_sensor_mode = msm_sensor_set_sensor_mode,
 	.sensor_mode_init = msm_sensor_mode_init,
@@ -497,11 +718,20 @@ static struct msm_sensor_reg_t s5k4e1_regs = {
 static struct msm_sensor_ctrl_t s5k4e1_s_ctrl = {
 	.msm_sensor_reg = &s5k4e1_regs,
 	.sensor_i2c_client = &s5k4e1_sensor_i2c_client,
+#ifdef CONFIG_MACH_LGE
+	.sensor_i2c_addr = 0x20,
+#else
 	.sensor_i2c_addr = 0x6C,
+#endif
 	.sensor_output_reg_addr = &s5k4e1_reg_addr,
 	.sensor_id_info = &s5k4e1_id_info,
 	.sensor_exp_gain_info = &s5k4e1_exp_gain_info,
 	.cam_mode = MSM_SENSOR_MODE_INVALID,
+
+	.csic_params = &s5k4e1_csi_params_array[0],
+#ifdef CONFIG_MACH_LGE
+	.csi_params = &s5k4e1_csi2_params_array[0],
+#endif
 	.msm_sensor_mutex = &s5k4e1_mut,
 	.sensor_i2c_driver = &s5k4e1_i2c_driver,
 	.sensor_v4l2_subdev_info = s5k4e1_subdev_info,

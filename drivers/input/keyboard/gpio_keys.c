@@ -324,7 +324,11 @@ static struct attribute_group gpio_keys_attr_group = {
 	.attrs = gpio_keys_attrs,
 };
 
+#if defined(CONFIG_MACH_LGE)
+static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata, bool from_resume)
+#else
 static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
+#endif
 {
 	const struct gpio_keys_button *button = bdata->button;
 	struct input_dev *input = bdata->input;
@@ -338,6 +342,28 @@ static void gpio_keys_gpio_report_event(struct gpio_button_data *bdata)
 		input_event(input, type, button->code, !!state);
 	}
 	input_sync(input);
+#if defined(CONFIG_MACH_LGE)
+	if (!from_resume)
+#if defined(CONFIG_MACH_LGE_F6_TMUS)||defined(CONFIG_MACH_LGE_F6_VDF) || defined(CONFIG_MACH_LGE_F6_ORG)||defined(CONFIG_MACH_LGE_F6_OPEN) || defined(CONFIG_MACH_LGE_F6_TMO)
+	/*
+                                     
+                                      
+ */
+		printk("[gpio-keys] %s KEY %s\n",
+			(button->code == KEY_VOLUMEUP) ? "Vol_UP" : ((button->code == KEY_VOLUMEDOWN) ? "Vol_DOWN" : ((button->code == KEY_QUICKMEMO) ? "Quick_Memo" : "HOME")),
+			(!!state) ? "PRESS" : "RELEASE");
+#elif defined(CONFIG_MACH_LGE_L9II_COMMON)
+		printk("[gpio-keys] %s KEY %s\n",
+			(button->code == KEY_VOLUMEUP) ? \
+			"Vol_UP" : ((button->code == KEY_VOLUMEDOWN) ? "Vol_DOWN" : "QUICK_MEMO"),\
+			(!!state) ? "PRESS" : "RELEASE");
+#else
+		printk("[gpio-keys] %s KEY %s\n",
+			(button->code == KEY_VOLUMEUP) ? \
+			"Vol_UP" : ((button->code == KEY_VOLUMEDOWN) ? "Vol_DOWN" : "HOME"),\
+			(!!state) ? "PRESS" : "RELEASE");
+#endif
+#endif
 }
 
 static void gpio_keys_gpio_work_func(struct work_struct *work)
@@ -345,7 +371,11 @@ static void gpio_keys_gpio_work_func(struct work_struct *work)
 	struct gpio_button_data *bdata =
 		container_of(work, struct gpio_button_data, work);
 
+#if defined(CONFIG_MACH_LGE)
+	gpio_keys_gpio_report_event(bdata, 0);
+#else
 	gpio_keys_gpio_report_event(bdata);
+#endif
 }
 
 static void gpio_keys_gpio_timer(unsigned long _data)
@@ -725,7 +755,11 @@ static int __devinit gpio_keys_probe(struct platform_device *pdev)
 	for (i = 0; i < pdata->nbuttons; i++) {
 		struct gpio_button_data *bdata = &ddata->data[i];
 		if (gpio_is_valid(bdata->button->gpio))
+#if defined(CONFIG_MACH_LGE)
+			gpio_keys_gpio_report_event(bdata, 0);
+#else
 			gpio_keys_gpio_report_event(bdata);
+#endif
 	}
 	input_sync(input);
 
@@ -804,12 +838,18 @@ static int gpio_keys_resume(struct device *dev)
 		struct gpio_button_data *bdata = &ddata->data[i];
 		if (bdata->button->wakeup && device_may_wakeup(dev))
 			disable_irq_wake(bdata->irq);
-
+#if defined(CONFIG_MACH_LGE_L9II_COMMON)
+	}
+#else
 		if (gpio_is_valid(bdata->button->gpio))
+#if defined(CONFIG_MACH_LGE)
+			gpio_keys_gpio_report_event(bdata, 1);
+#else
 			gpio_keys_gpio_report_event(bdata);
+#endif
 	}
 	input_sync(ddata->input);
-
+#endif
 	return 0;
 }
 #endif

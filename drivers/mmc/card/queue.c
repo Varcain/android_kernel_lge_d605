@@ -75,6 +75,10 @@ static int mmc_queue_thread(void *d)
 		spin_unlock_irq(q->queue_lock);
 
 		if (req || mq->mqrq_prev->req) {
+/*            */
+#ifndef BKOPS_UPDATE
+
+#else
 			/*
 			 * If this is the first request, BKOPs might be in
 			 * progress and needs to be stopped before issuing the
@@ -85,6 +89,7 @@ static int mmc_queue_thread(void *d)
 				card->bkops_info.started_delayed_bkops = false;
 				mmc_stop_bkops(card);
 			}
+#endif
 
 			set_current_state(TASK_RUNNING);
 			mq->issue_fn(mq, req);

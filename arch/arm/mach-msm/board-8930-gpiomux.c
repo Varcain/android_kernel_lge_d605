@@ -132,6 +132,7 @@ static struct gpiomux_setting wcnss_5wire_active_cfg = {
 	.pull = GPIOMUX_PULL_DOWN,
 };
 
+#if defined (CONFIG_TOUCHSCREEN_ATMEL_TSADCC) /*     */
 static struct gpiomux_setting atmel_resout_sus_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
 	.drv = GPIOMUX_DRV_6MA,
@@ -167,6 +168,8 @@ static struct gpiomux_setting atmel_int_sus_cfg = {
 	.drv = GPIOMUX_DRV_2MA,
 	.pull = GPIOMUX_PULL_DOWN,
 };
+#endif /*     */
+
 #ifdef MSM8930_PHASE_2
 static struct gpiomux_setting hsusb_sus_cfg = {
 	.func = GPIOMUX_FUNC_GPIO,
@@ -509,6 +512,7 @@ static struct msm_gpiomux_config wcnss_5wire_interface[] = {
 	},
 };
 
+#if defined (CONFIG_TOUCHSCREEN_ATMEL_TSADCC) /*     */
 static struct msm_gpiomux_config msm8960_atmel_configs[] __initdata = {
 	{	/* TS INTERRUPT */
 		.gpio = 11,
@@ -532,6 +536,7 @@ static struct msm_gpiomux_config msm8960_atmel_configs[] __initdata = {
 		},
 	},
 };
+#endif /*     */
 
 static struct msm_gpiomux_config hap_lvl_shft_config[] __initdata = {
 	{
@@ -742,8 +747,10 @@ int __init msm8930_init_gpiomux(void)
 	msm_gpiomux_install(msm8960_gsbi_configs,
 			ARRAY_SIZE(msm8960_gsbi_configs));
 
+#if defined (CONFIG_TOUCHSCREEN_ATMEL_TSADCC) /*     */
 	msm_gpiomux_install(msm8960_atmel_configs,
 			ARRAY_SIZE(msm8960_atmel_configs));
+#endif /*     */
 
 	msm_gpiomux_install(msm8960_slimbus_config,
 			ARRAY_SIZE(msm8960_slimbus_config));

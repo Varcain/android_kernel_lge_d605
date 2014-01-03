@@ -56,6 +56,7 @@
 #include <linux/debugfs.h>
 #include <asm/atomic.h>
 #include <asm/irq.h>
+#include <asm/system.h>
 
 #include <mach/hardware.h>
 #include <mach/dma.h>
@@ -800,6 +801,50 @@ unsigned int msm_hs_tx_empty(struct uart_port *uport)
 }
 EXPORT_SYMBOL(msm_hs_tx_empty);
 
+//                                             
+//ADD: 0019639: [F200][BT] Support Bluetooth low power mode
+#ifdef CONFIG_LGE_BLUESLEEP
+struct uart_port* msm_hs_get_bt_uport(unsigned int line)
+{
+     return &q_uart_port[line].uport;
+}
+EXPORT_SYMBOL(msm_hs_get_bt_uport);
+
+// Get UART Clock State : 
+int msm_hs_get_bt_uport_clock_state(struct uart_port *uport)
+{
+	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
+	//unsigned long flags;	
+	int ret = CLOCK_REQUEST_UNAVAILABLE;
+
+	//mutex_lock(&msm_uport->clk_mutex);
+	//spin_lock_irqsave(&uport->lock, flags);
+
+	switch(msm_uport->clk_state)
+	{
+		case MSM_HS_CLK_ON:
+		case MSM_HS_CLK_PORT_OFF:
+			printk(KERN_ERR "UART Clock already on or port not use : %d\n", msm_uport->clk_state);
+			ret = CLOCK_REQUEST_UNAVAILABLE;
+			break;
+		case MSM_HS_CLK_REQUEST_OFF:
+		case MSM_HS_CLK_OFF:
+			printk(KERN_ERR "Uart clock off. Please clock on : %d\n", msm_uport->clk_state);
+			ret = CLOCK_REQUEST_AVAILABLE;
+			break;
+	}
+
+	//spin_unlock_irqrestore(&uport->lock, flags);
+	//mutex_unlock(&msm_uport->clk_mutex);
+
+	return ret;
+}
+EXPORT_SYMBOL(msm_hs_get_bt_uport_clock_state);
+
+
+#endif/*                    */
+//                                           
+
 /*
  *  Standard API, Stop transmitter.
  *  Any character in the transmit shift register is sent as
@@ -824,6 +869,17 @@ static void msm_hs_stop_rx_locked(struct uart_port *uport)
 {
 	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
 	unsigned int data;
+
+	// +s QCT_PATCH_HW_RESET_AFTER_AIRPLANE
+	if (msm_uport->clk_state == MSM_HS_CLK_OFF) {
+		spin_unlock(&uport->lock);
+		clk_prepare_enable(msm_uport->clk);
+		if (msm_uport->pclk)
+			clk_prepare_enable(msm_uport->pclk);
+		spin_lock(&uport->lock);
+	}
+	// +e QCT_PATCH_HW_RESET_AFTER_AIRPLANE
+
 
 	/* disable dlink */
 	data = msm_hs_read(uport, UARTDM_DMEN_ADDR);
@@ -1468,7 +1524,8 @@ static irqreturn_t msm_hs_isr(int irq, void *dev)
 		 */
 		mb();
 		/* Complete DMA TX transactions and submit new transactions */
-
+//+++LG_BTUI : [JB_Only_BRCM]  To vouch entering UART start mode and avoiding flushed buffer when bt transfer hci command in dut mode.
+#if 0
 		/* Do not update tx_buf.tail if uart_flush_buffer already
 						called in serial core */
 		if (!msm_uport->tty_flush_receive)
@@ -1476,6 +1533,12 @@ static irqreturn_t msm_hs_isr(int irq, void *dev)
 					tx->tx_count) & ~UART_XMIT_SIZE;
 		else
 			msm_uport->tty_flush_receive = false;
+#else
+			tx_buf->tail = (tx_buf->tail +
+					tx->tx_count) & ~UART_XMIT_SIZE;
+
+#endif
+//---LG_BTUI : [JB_Only_BRCM]  To vouch entering UART start mode and avoiding flushed buffer when bt transfer hci command in dut mode.
 
 		tx->dma_in_flight = 0;
 

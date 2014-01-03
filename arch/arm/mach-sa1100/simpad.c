@@ -390,7 +390,7 @@ arch_initcall(simpad_init);
 
 
 MACHINE_START(SIMPAD, "Simpad")
-	/* Maintainer: Holger Freyther */
+	/*                             */
 	.atag_offset	= 0x100,
 	.map_io		= simpad_map_io,
 	.nr_irqs	= SA1100_NR_IRQS,

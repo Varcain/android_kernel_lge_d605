@@ -127,12 +127,12 @@ struct msm_rpm_platform_data msm8930_rpm_data __initdata = {
 		MSM_RPM_MAP(8930, PM8038_CLK2_0, PM8038_CLK2, 2),
 		MSM_RPM_MAP(8930, PM8038_LVS1, PM8038_LVS1, 1),
 		MSM_RPM_MAP(8930, PM8038_LVS2, PM8038_LVS2, 1),
-		MSM_RPM_MAP_PMIC(8930, 8038, NCP_0, NCP, 2),
-		MSM_RPM_MAP_PMIC(8930, 8038, CXO_BUFFERS, CXO_BUFFERS, 1),
-		MSM_RPM_MAP_PMIC(8930, 8038, USB_OTG_SWITCH, USB_OTG_SWITCH, 1),
-		MSM_RPM_MAP_PMIC(8930, 8038, HDMI_SWITCH, HDMI_SWITCH, 1),
-		MSM_RPM_MAP_PMIC(8930, 8038, QDSS_CLK, QDSS_CLK, 1),
-		MSM_RPM_MAP_PMIC(8930, 8038, VOLTAGE_CORNER, VOLTAGE_CORNER, 1),
+		MSM_RPM_MAP(8930, NCP_0, NCP, 2),
+		MSM_RPM_MAP(8930, CXO_BUFFERS, CXO_BUFFERS, 1),
+		MSM_RPM_MAP(8930, USB_OTG_SWITCH, USB_OTG_SWITCH, 1),
+		MSM_RPM_MAP(8930, HDMI_SWITCH, HDMI_SWITCH, 1),
+		MSM_RPM_MAP(8930, QDSS_CLK, QDSS_CLK, 1),
+		MSM_RPM_MAP(8930, VOLTAGE_CORNER, VOLTAGE_CORNER, 1),
 	},
 	.target_status = {
 		MSM_RPM_STATUS_ID_MAP(8930, VERSION_MAJOR),
@@ -353,12 +353,12 @@ struct msm_rpm_platform_data msm8930_rpm_data_pm8917 __initdata = {
 		MSM_RPM_MAP(8930, PM8917_LVS5, PM8917_LVS5, 1),
 		MSM_RPM_MAP(8930, PM8917_LVS6, PM8917_LVS6, 1),
 		MSM_RPM_MAP(8930, PM8917_LVS7, PM8917_LVS7, 1),
-		MSM_RPM_MAP_PMIC(8930, 8917, NCP_0, NCP, 2),
-		MSM_RPM_MAP_PMIC(8930, 8917, CXO_BUFFERS, CXO_BUFFERS, 1),
-		MSM_RPM_MAP_PMIC(8930, 8917, USB_OTG_SWITCH, USB_OTG_SWITCH, 1),
-		MSM_RPM_MAP_PMIC(8930, 8917, HDMI_SWITCH, HDMI_SWITCH, 1),
-		MSM_RPM_MAP_PMIC(8930, 8917, QDSS_CLK, QDSS_CLK, 1),
-		MSM_RPM_MAP_PMIC(8930, 8917, VOLTAGE_CORNER, VOLTAGE_CORNER, 1),
+		MSM_RPM_MAP(8930, NCP_0, NCP, 2),
+		MSM_RPM_MAP(8930, CXO_BUFFERS, CXO_BUFFERS, 1),
+		MSM_RPM_MAP(8930, USB_OTG_SWITCH, USB_OTG_SWITCH, 1),
+		MSM_RPM_MAP(8930, HDMI_SWITCH, HDMI_SWITCH, 1),
+		MSM_RPM_MAP(8930, QDSS_CLK, QDSS_CLK, 1),
+		MSM_RPM_MAP(8930, VOLTAGE_CORNER, VOLTAGE_CORNER, 1),
 	},
 	.target_status = {
 		MSM_RPM_STATUS_ID_MAP(8930, VERSION_MAJOR),
@@ -715,8 +715,11 @@ static struct fs_driver_data mdp_fs_data_8930 = {
 		{ .name = "bus_clk" },
 		{ .name = "vsync_clk" },
 		{ .name = "lut_clk" },
+/*            */
+#ifdef CONFIG_FB_MSM_HDMI_MSM_PANEL
 		{ .name = "tv_src_clk" },
 		{ .name = "tv_clk" },
+#endif
 		{ .name = "reset1_clk" },
 		{ 0 }
 	},
@@ -1142,6 +1145,7 @@ struct msm_vidc_platform_data apq8930_vidc_platform_data = {
 	.disable_fullhd = 0,
 	.cont_mode_dpb_count = 18,
 	.fw_addr = 0x9fe00000,
+	.vote_high_bw = 1,  /*                                                                                                       */
 };
 
 struct platform_device apq8930_msm_device_vidc = {

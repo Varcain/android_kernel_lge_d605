@@ -231,6 +231,24 @@ static int msm_voip_dtx_mode_get(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+/* [FX3 AUDIO_BSP] SPCS&MPCS Voip call Volume level is 7 steps */
+#if defined(CONFIG_MACH_LGE_FX3_SPCS) || defined(CONFIG_MACH_LGE_FX3_MPCS) || \
+	defined(CONFIG_MACH_LGE_FX3_TMUS) || defined(CONFIG_MACH_LGE_F6_TMUS) || \
+	defined(CONFIG_MACH_LGE_FX3_SPCSTRF) || defined(CONFIG_MACH_LGE_FX3_CRK) || defined(CONFIG_MACH_LGE_FX3_WCDMA_TRF_US) || \
+	defined(CONFIG_MACH_LGE_L9II_COMMON)|| defined(CONFIG_MACH_LGE_F6_VDF) || defined(CONFIG_MACH_LGE_F6_ORG)|| defined(CONFIG_MACH_LGE_F6_OPEN) || defined(CONFIG_MACH_LGE_F6_TMO)
+static struct snd_kcontrol_new msm_voip_controls[] = {
+	SOC_SINGLE_EXT("Voip Tx Mute", SND_SOC_NOPM, 0, 1, 0,
+				msm_voip_mute_get, msm_voip_mute_put),
+	SOC_SINGLE_EXT("Voip Rx Volume", SND_SOC_NOPM, 0, 6, 0,
+				msm_voip_volume_get, msm_voip_volume_put),
+	SOC_SINGLE_MULTI_EXT("Voip Mode Rate Config", SND_SOC_NOPM, 0, 23850,
+				0, 2, msm_voip_mode_rate_config_get,
+				msm_voip_mode_rate_config_put),
+	SOC_SINGLE_EXT("Voip Dtx Mode", SND_SOC_NOPM, 0, 1, 0,
+				msm_voip_dtx_mode_get, msm_voip_dtx_mode_put),
+};
+
+#else
 static struct snd_kcontrol_new msm_voip_controls[] = {
 	SOC_SINGLE_EXT("Voip Tx Mute", SND_SOC_NOPM, 0, 1, 0,
 				msm_voip_mute_get, msm_voip_mute_put),
@@ -242,6 +260,7 @@ static struct snd_kcontrol_new msm_voip_controls[] = {
 	SOC_SINGLE_EXT("Voip Dtx Mode", SND_SOC_NOPM, 0, 1, 0,
 				msm_voip_dtx_mode_get, msm_voip_dtx_mode_put),
 };
+#endif
 
 static int msm_pcm_voip_probe(struct snd_soc_platform *platform)
 {

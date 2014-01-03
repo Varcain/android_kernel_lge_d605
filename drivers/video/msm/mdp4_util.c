@@ -392,7 +392,10 @@ void mdp4_hw_init(void)
 	/* MDP cmd block enable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 
+#if defined(CONFIG_MDP_RUNTIME_BANDWIDTH)
+#else
 	mdp_bus_scale_update_request(5);
+#endif
 
 #ifdef MDP4_ERROR
 	/*
@@ -463,6 +466,11 @@ void mdp4_hw_init(void)
 
 	/* MDP cmd block disable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
+
+#ifdef CSC_RESTORE
+	if(csc_dmap_changed)
+		mdp4_csc_config(&csc_cfg_backup_matrix);
+#endif
 }
 
 

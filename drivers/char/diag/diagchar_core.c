@@ -38,6 +38,12 @@
 #endif
 #include <linux/timer.h>
 
+#ifdef CONFIG_LGE_USB_DIAG_DISABLE
+#include <mach/board_lge.h>
+#include <linux/platform_device.h>
+#include "diag_lock.h"
+#endif
+
 MODULE_DESCRIPTION("Diag Char Driver");
 MODULE_LICENSE("GPL v2");
 MODULE_VERSION("1.0");
@@ -262,6 +268,7 @@ static int diagchar_close(struct inode *inode, struct file *file)
 	/* If the SD logging process exits, change logging to USB mode */
 	if (driver->logging_process_id == current->tgid) {
 		driver->logging_mode = USB_MODE;
+		printk("diagchar : [%s:%d] USB_DIAG_CONNECT\n", __func__, __LINE__);
 		diagfwd_connect();
 #ifdef CONFIG_DIAG_BRIDGE_CODE
 		diag_clear_hsic_tbl();
@@ -672,18 +679,21 @@ long diagchar_ioctl(struct file *filp,
 #ifdef CONFIG_DIAG_OVER_USB
 		else if (temp == USB_MODE && driver->logging_mode
 							 == NO_LOGGING_MODE) {
+			printk("diagchar : [%s] USB_DIAG_DISCONNECT\n", __func__);
 			diagfwd_disconnect();
 #ifdef CONFIG_DIAG_BRIDGE_CODE
 			diagfwd_disconnect_bridge(0);
 #endif
 		} else if (temp == NO_LOGGING_MODE && driver->logging_mode
 								== USB_MODE) {
+			printk("diagchar : [%s] USB_DIAG_CONNECT\n", __func__);
 			diagfwd_connect();
 #ifdef CONFIG_DIAG_BRIDGE_CODE
 			diagfwd_connect_bridge(0);
 #endif
 		} else if (temp == USB_MODE && driver->logging_mode
 							== MEMORY_DEVICE_MODE) {
+			printk("diagchar : [%s:%d] USB_DIAG_DISCONNECT\n", __func__, __LINE__);
 			diagfwd_disconnect();
 			driver->in_busy_1 = 0;
 			driver->in_busy_2 = 0;
@@ -715,6 +725,7 @@ long diagchar_ioctl(struct file *filp,
 #endif
 		} else if (temp == MEMORY_DEVICE_MODE &&
 				 driver->logging_mode == USB_MODE) {
+			printk("diagchar : [%s:%d] USB_DIAG_CONNECT\n", __func__, __LINE__);
 			diagfwd_connect();
 #ifdef CONFIG_DIAG_BRIDGE_CODE
 			diag_clear_hsic_tbl();
@@ -1414,6 +1425,149 @@ void diag_bridge_fn(int type)
 #else
 inline void diag_bridge_fn(int type) {}
 #endif
+#ifdef CONFIG_LGE_USB_DIAG_DISABLE
+extern void diagfwd_enable(int enable);
+#ifdef CONFIG_DIAG_BRIDGE_CODE
+extern void diagfwd_hsic_enable(int enable);
+#endif
+
+static void diag_enable(int enable)
+{
+    set_diag_state(enable);
+    diagfwd_enable(enable);
+#ifdef CONFIG_DIAG_BRIDGE_CODE
+    diagfwd_hsic_enable(enable);
+#endif
+}
+
+static ssize_t read_diag_enable(struct device *dev,
+        struct device_attribute *attr,
+        char *buf)
+{
+    return sprintf(buf, "%d", diag_state());
+}
+
+static ssize_t write_diag_enable(struct device *dev,
+        struct device_attribute *attr,
+        const char *buf, size_t size)
+{
+    char *p;
+
+    p = strchr(buf, '\n');
+    if (p) *p = '\0';
+
+    if (!strcmp(buf, "1"))
+        diag_enable(DIAG_DISABLE);
+    else if (!strcmp(buf, "0"))
+        diag_enable(DIAG_ENABLE);
+    else
+        pr_err("%s: unknown value\n", __func__);
+
+    return size;
+}
+
+static DEVICE_ATTR(diag_enable, S_IRUGO | S_IWUSR, read_diag_enable, write_diag_enable);
+
+struct device *_diag_event;
+static int diag_lock_count = 0;
+static ssize_t show_diag_event(struct device *dev,
+	struct device_attribute *attr,
+	char *buf)
+{
+	diag_lock_count = lge_get_emergency_status();
+	return sprintf(buf, "%d\n", diag_lock_count);
+}
+static DEVICE_ATTR(diag_event, S_IRUGO, show_diag_event, NULL);
+
+static int lg_diag_event_probe(struct platform_device *pdev)
+{
+    int ret;
+	/* /sys/bus/platform/drivers/lg_diag_event */
+    /* /sys/devices/platform/lg_diag_event/diag_event */
+    _diag_event = &pdev->dev;
+    ret = device_create_file(&pdev->dev, &dev_attr_diag_event);
+    if (ret) {
+        pr_err("%s: create fail diag_event\n", __func__);
+        device_remove_file(&pdev->dev, &dev_attr_diag_event);
+    }
+
+    return ret;
+}
+
+static int lg_diag_event_remove(struct platform_device *pdev)
+{
+    device_remove_file(&pdev->dev, &dev_attr_diag_event);
+    return 0;
+}
+
+static struct platform_driver lg_diag_event_driver = {
+    .probe		= lg_diag_event_probe,
+    .remove		= lg_diag_event_remove,
+    .driver		= {
+        .name = "lg_diag_event",
+        .owner  = THIS_MODULE,
+    },
+};
+
+static int lg_diag_cmd_probe(struct platform_device *pdev)
+{
+    int ret;
+
+    /* /sys/devices/platform/lg_diag_cmd/diag_enable */
+    ret = device_create_file(&pdev->dev, &dev_attr_diag_enable);
+    if (ret) {
+        pr_err("%s: create fail diag_enable\n", __func__);
+        device_remove_file(&pdev->dev, &dev_attr_diag_enable);
+    }
+
+    return ret;
+}
+
+static int lg_diag_cmd_remove(struct platform_device *pdev)
+{
+    device_remove_file(&pdev->dev, &dev_attr_diag_enable);
+    return 0;
+}
+
+static struct platform_driver lg_diag_cmd_driver = {
+    .probe		= lg_diag_cmd_probe,
+    .remove 	= lg_diag_cmd_remove,
+    .driver 	= {
+        .name = "lg_diag_cmd",
+        .owner	= THIS_MODULE,
+    },
+};
+
+struct delayed_work diag_event_work;
+void android_diaglock_work(void)
+{
+	schedule_delayed_work(&diag_event_work, msecs_to_jiffies(3000));
+}
+
+EXPORT_SYMBOL(android_diaglock_work);
+
+void android_diagunlock_work(void)
+{
+	diag_enable(DIAG_ENABLE);
+}
+EXPORT_SYMBOL(android_diagunlock_work);
+
+void write_diagstatus_event(struct work_struct *data)
+{
+	static char *envp_mode[2] = {"DIAG_STATE=CHANGED", NULL};
+	char **uevent_envp = NULL;
+	uevent_envp = envp_mode;
+	printk("[USB : %s : %d]\n", __func__, __LINE__);
+	if (uevent_envp) {
+        kobject_uevent_env(&_diag_event->kobj, KOBJ_CHANGE, uevent_envp);
+        diag_enable(DIAG_DISABLE);
+	}
+    else
+        pr_err("%s: Did not send uevent.\n", __func__);
+
+	return;
+}
+#endif /*                             */
 
 static int __init diagchar_init(void)
 {
@@ -1490,6 +1644,12 @@ static int __init diagchar_init(void)
 		printk(KERN_INFO "kzalloc failed\n");
 		goto fail;
 	}
+
+#ifdef CONFIG_LGE_USB_DIAG_DISABLE
+	platform_driver_register(&lg_diag_cmd_driver);
+	platform_driver_register(&lg_diag_event_driver);
+	INIT_DELAYED_WORK(&diag_event_work, write_diagstatus_event);
+#endif
 
 	pr_info("diagchar initialized now");
 	return 0;

@@ -83,6 +83,16 @@ obj-$(CONFIG_FB_MSM_MIPI_DSI_TRULY) += mipi_truly.o
 obj-$(CONFIG_FB_MSM_MIPI_DSI_NT35510) += mipi_NT35510.o
 obj-$(CONFIG_FB_MSM_MIPI_DSI_NT35516) += mipi_truly_tft540960_1_e.o
 obj-$(CONFIG_FB_MSM_MIPI_DSI_SIMULATOR) += mipi_simulator.o
+# LGE_CHANGE_S. minjong.gong@lge.com. 2011.06.20
+obj-$(CONFIG_FB_MSM_MIPI_DSI_LGIT) += mipi_lgit.o
+obj-$(CONFIG_FB_MSM_MIPI_DSI_HITACHI) += mipi_hitachi.o
+obj-$(CONFIG_FB_MSM_MIPI_DSI_LGD) += mipi_lgd.o
+obj-$(CONFIG_FB_MSM_MIPI_DSI_HIMAX) += mipi_himax.o
+obj-$(CONFIG_FB_MSM_MIPI_DSI_TX11D108VM) += mipi_tx11d108vm.o
+# LGE_CHANGE_E 
+# LGE_CHANGE_S [koh.euije@lge.com] LCD for L9II REV
+obj-$(CONFIG_FB_MSM_MIPI_DSI_TX13D107VM) += mipi_tx13d107vm.o
+# LGE_CHANGE_E [koh.euije@lge.com] LCD for L9II REV
 
 # MIPI Bridge
 obj-$(CONFIG_FB_MSM_MIPI_DSI_TC358764_DSI2LVDS) += mipi_tc358764_dsi2lvds.o
@@ -129,6 +139,22 @@ obj-y += mipi_chimei_wxga_pt.o
 obj-y += mipi_chimei_wuxga.o
 obj-y += mipi_truly_video_wvga_pt.o
 else
+
+# LGE_CHANGE_S
+obj-$(CONFIG_FB_MSM_MIPI_HITACHI_R69324A_VIDEO_WVGA_PT) += mipi_hitachi_r69324a_video_wvga_pt.o
+obj-$(CONFIG_FB_MSM_MIPI_HIMAX_H8379A_VIDEO_WVGA_PT) += mipi_himax_h8379a_video_wvga_pt.o
+obj-$(CONFIG_FB_MSM_MIPI_TX11D108VM_R69324A_VIDEO_QHD_PT) += mipi_tx11d108vm_r69324a_video_qhd_pt.o
+# LGE_CHANGE_E
+
+# LGE_CHANGE_S [koh.euije@lge.com] LCD for L9II EVB
+obj-$(CONFIG_FB_MSM_MIPI_HITACHI_R69328A_VIDEO_HD_PT) += mipi_hitachi_r69328_video_hd_pt.o
+# LGE_CHANGE_E [koh.euije@lge.com] LCD for L9II EVB
+# LGE_CHANGE_S [koh.euije@lge.com] LCD for L9II REV
+obj-$(CONFIG_FB_MSM_MIPI_TX13D107VM_NT35521_VIDEO_HD_PT) += mipi_tx13d107vm_nt35521_video_hd_pt.o
+# LGE_CHANGE_E [koh.euije@lge.com] LCD for L9II REV
+
+
+#
 obj-$(CONFIG_FB_MSM_MIPI_TOSHIBA_VIDEO_WVGA_PT) += mipi_toshiba_video_wvga_pt.o
 obj-$(CONFIG_FB_MSM_MIPI_TOSHIBA_VIDEO_WSVGA_PT) += mipi_toshiba_video_wsvga_pt.o
 obj-$(CONFIG_FB_MSM_MIPI_TOSHIBA_VIDEO_WUXGA) += mipi_toshiba_video_wuxga.o
@@ -193,5 +219,6 @@ endif
 
 obj-$(CONFIG_MSM_VIDC_1080P) += vidc/
 obj-$(CONFIG_MSM_VIDC_720P) += vidc/
+obj-$(CONFIG_LGE_LCD_TUNING) += lge_lcd_misc_ctrl.o
 clean:
 	rm *.o .*cmd

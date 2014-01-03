@@ -197,6 +197,11 @@
 
 #define HFR_MODE_OFF 1
 #define VFE_FRAME_SKIP_PERIOD_MASK 0x0000001F /*bits 0 -4*/
+/*                                                                         */
+#if (1)
+#define VFE_RELOAD_ALL_WRITE_MASTERS 0x00003FFF
+#endif
+/*                                                                         */
 
 enum VFE32_DMI_RAM_SEL {
 	NO_MEM_SELECTED          = 0,
@@ -229,6 +234,12 @@ enum vfe_output_state {
 	VFE_STATE_STARTED,
 	VFE_STATE_STOP_REQUESTED,
 	VFE_STATE_STOPPED,
+	/*                                                                         */
+	#if (1)
+	VFE_STATE_HW_STOP_REQUESTED,
+	VFE_STATE_HW_STOPPED,
+	#endif
+	/*                                                                         */
 };
 
 #define V32_CAMIF_OFF             0x000001E4
@@ -891,6 +902,11 @@ struct vfe32_frame_extra {
 #define VFE_BUS_STATS_SKIN_BHIST_WR_PONG_ADDR    0x00000140
 #define VFE_BUS_STATS_SKIN_BHIST_UB_CFG          0x00000144
 #define VFE_CAMIF_COMMAND               0x000001E0
+/*                                                                         */
+#if (1)
+#define VFE_CAMIF_FRAME_CFG		0x000001EC
+#endif
+/*                                                                         */
 #define VFE_CAMIF_STATUS                0x00000204
 #define VFE_REG_UPDATE_CMD              0x00000260
 #define VFE_DEMUX_GAIN_0                0x00000288
@@ -1015,6 +1031,11 @@ struct axi_ctrl_t {
 	struct vfe_share_ctrl_t *share_ctrl;
 	struct device *iommu_ctx_imgwr;
 	struct device *iommu_ctx_misc;
+/*                                                                       */
+#ifdef LGE_GK_CAMERA_BSP
+	struct mutex state_mutex;
+#endif
+/*                                                                       */
 };
 
 struct vfe32_ctrl_type {

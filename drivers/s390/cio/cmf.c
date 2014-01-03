@@ -148,10 +148,10 @@ static inline u64 time_to_nsec(u32 value)
 }
 
 /*
- * Users are usually interested in average times,
- * not accumulated time.
- * This also helps us with atomicity problems
- * when reading sinlge values.
+                                                 
+                        
+                                             
+                              
  */
 static inline u64 time_to_avg_nsec(u32 value, u32 count)
 {

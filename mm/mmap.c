@@ -38,6 +38,18 @@
 
 #include "internal.h"
 
+#ifndef CONFIG_MACH_LGE_L9II_COMMON
+/*             
+  
+                                        
+                                             
+  
+                                  
+ */
+#include "../fs/sreadahead_prof.h"
+/*              */
+#endif
+
 #ifndef arch_mmap_check
 #define arch_mmap_check(addr, len, flags)	(0)
 #endif
@@ -1022,6 +1034,18 @@ static unsigned long do_mmap_pgoff(struct file *file, unsigned long addr,
 	}
 
 	inode = file ? file->f_path.dentry->d_inode : NULL;
+
+#ifndef CONFIG_MACH_LGE_L9II_COMMON
+/*             
+  
+                                        
+                                             
+  
+                                  
+ */
+	if( file) sreadahead_prof( file, len, ((loff_t)pgoff)<<PAGE_SHIFT);
+/*              */
+#endif
 
 	if (file) {
 		switch (flags & MAP_TYPE) {

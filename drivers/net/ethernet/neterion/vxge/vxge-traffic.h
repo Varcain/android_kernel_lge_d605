@@ -1603,25 +1603,25 @@ struct vxge_hw_vpath_stats_sw_ring_info {
 
 };
 
-/**
- * struct vxge_hw_vpath_stats_sw_err - HW vpath error statistics
- * @unknown_alarms:
- * @network_sustained_fault:
- * @network_sustained_ok:
- * @kdfcctl_fifo0_overwrite:
- * @kdfcctl_fifo0_poison:
- * @kdfcctl_fifo0_dma_error:
- * @dblgen_fifo0_overflow:
- * @statsb_pif_chain_error:
- * @statsb_drop_timeout:
- * @target_illegal_access:
- * @ini_serr_det:
- * @prc_ring_bumps:
- * @prc_rxdcm_sc_err:
- * @prc_rxdcm_sc_abort:
- * @prc_quanta_size_err:
- *
- * HW vpath error statistics
+/* 
+                                                                
+                   
+                            
+                         
+                            
+                         
+                            
+                          
+                           
+                        
+                          
+                 
+                   
+                     
+                       
+                        
+  
+                            
  */
 struct vxge_hw_vpath_stats_sw_err {
 	u32	unknown_alarms;

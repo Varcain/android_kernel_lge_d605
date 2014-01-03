@@ -202,6 +202,13 @@ int diag_hdlc_decode(struct diag_hdlc_decode_type *hdlc)
 							  ^ ESC_MASK;
 				}
 			} else if (src_byte == CONTROL_CHAR) {
+				/*                                                                                                                      */
+				#if (defined(CONFIG_MACH_LGE_FX3_SPCS) || defined(CONFIG_MACH_LGE_FX3_SPCSTRF)) //                                                                    
+				if (len == 0) {
+					continue;
+				}
+				#endif
+        /*                */
 				dest_ptr[len++] = src_byte;
 				pkt_bnd = 1;
 				i++;

@@ -22,6 +22,14 @@
 #ifdef CONFIG_WAKELOCK_STAT
 #include <linux/proc_fs.h>
 #endif
+
+#ifdef CONFIG_MACH_LGE
+#include <linux/debugfs.h>
+#include <linux/seq_file.h>
+
+#include <mach/lge_blocking_monitor.h>
+#endif
+
 #include "power.h"
 
 enum {
@@ -53,6 +61,15 @@ struct wake_lock main_wake_lock;
 suspend_state_t requested_suspend_state = PM_SUSPEND_MEM;
 static struct wake_lock unknown_wakeup;
 static struct wake_lock suspend_backoff_lock;
+
+#ifdef CONFIG_MACH_LGE
+static struct timespec suspend_time_before;
+static unsigned int time_in_suspend_bins[33];
+static void suspend_time_suspend(void);
+static void suspend_time_resume(void);
+
+static int wakelock_monitor_id;
+#endif
 
 #define SUSPEND_BACKOFF_THRESHOLD	10
 #define SUSPEND_BACKOFF_INTERVAL	10000
@@ -342,19 +359,40 @@ static void suspend(struct work_struct *work)
 	int entry_event_num;
 	struct timespec ts_entry, ts_exit;
 
+#ifdef CONFIG_MACH_LGE
+	start_monitor_blocking(wakelock_monitor_id,
+		jiffies + usecs_to_jiffies(5000000));
+#endif
+
 	if (has_wake_lock(WAKE_LOCK_SUSPEND)) {
 		if (debug_mask & DEBUG_SUSPEND)
 			pr_info("suspend: abort suspend\n");
+#ifdef CONFIG_MACH_LGE
+		end_monitor_blocking(wakelock_monitor_id);
+#endif
 		return;
 	}
 
+#ifdef CONFIG_MACH_LGE
+	save_suspend_step(SUSPEND_START);
+#endif
 	entry_event_num = current_event_num;
 	suspend_sys_sync_queue();
 	if (debug_mask & DEBUG_SUSPEND)
 		pr_info("suspend: enter suspend\n");
 	getnstimeofday(&ts_entry);
+#ifdef CONFIG_MACH_LGE
+	suspend_time_suspend();
+	save_suspend_step(SUSPEND_ENTERSUSPEND);
+#endif
 	ret = pm_suspend(requested_suspend_state);
+#ifdef CONFIG_MACH_LGE
+	save_suspend_step(SUSPEND_EXITSUSPEND);
+#endif
 	getnstimeofday(&ts_exit);
+#ifdef CONFIG_MACH_LGE
+	suspend_time_resume();
+#endif
 
 	if (debug_mask & DEBUG_EXIT_SUSPEND) {
 		struct rtc_time tm;
@@ -381,6 +419,10 @@ static void suspend(struct work_struct *work)
 			pr_info("suspend: pm_suspend returned with no event\n");
 		wake_lock_timeout(&unknown_wakeup, HZ / 2);
 	}
+#ifdef CONFIG_MACH_LGE
+	save_suspend_step(SUSPEND_EXITDONE);
+	end_monitor_blocking(wakelock_monitor_id);
+#endif
 }
 static DECLARE_WORK(suspend_work, suspend);
 
@@ -614,6 +656,26 @@ int wake_lock_active(struct wake_lock *lock)
 }
 EXPORT_SYMBOL(wake_lock_active);
 
+#ifdef CONFIG_MACH_LGE
+int wake_lock_active_name(char *name)
+{
+	struct wake_lock *lock;
+
+	if (!name)
+		return 0;
+
+	list_for_each_entry(lock, &active_wake_locks[WAKE_LOCK_SUSPEND], link) {
+		if (!strncmp(lock->name, name, strlen(name))) {
+			pr_info("%s: %s is activated\n", __func__, lock->name);
+			return wake_lock_active(lock);
+		}
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL(wake_lock_active_name);
+#endif
+
 static int wakelock_stats_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, wakelock_stats_show, NULL);
@@ -674,6 +736,13 @@ static int __init wakelocks_init(void)
 	proc_create("wakelocks", S_IRUGO, NULL, &wakelock_stats_fops);
 #endif
 
+#ifdef CONFIG_MACH_LGE
+	wakelock_monitor_id = create_blocking_monitor("wakelocks");
+
+	if (wakelock_monitor_id < 0)
+		return wakelock_monitor_id;
+#endif
+
 	return 0;
 
 err_suspend_work_queue:
@@ -707,6 +776,193 @@ static void  __exit wakelocks_exit(void)
 	wake_lock_destroy(&deleted_wake_locks);
 #endif
 }
+
+#ifdef CONFIG_DEBUG_FS
+#ifdef CONFIG_MACH_LGE
+static void suspend_time_suspend(void)
+{
+	getnstimeofday(&suspend_time_before);
+	return;
+}
+
+static void suspend_time_resume(void)
+{
+	struct timespec after;
+	getnstimeofday(&after);
+
+	after = timespec_sub(after, suspend_time_before);
+
+	time_in_suspend_bins[fls(after.tv_sec)]++;
+
+	pr_info("Suspended for %lu.%03lu seconds\n", after.tv_sec,
+			after.tv_nsec / NSEC_PER_MSEC);
+	return;
+}
+
+static int suspend_time_debug_show(struct seq_file *s, void *data)
+{
+	int bin;
+	seq_printf(s, "time (secs)  count\n");
+	seq_printf(s, "------------------\n");
+	for (bin = 0; bin < 33; bin++) {
+		if (time_in_suspend_bins[bin] == 0)
+			continue;
+		seq_printf(s, "%4d - %4d %4u\n",
+				bin ? 1 << (bin - 1) : 0, 1 << bin,
+				time_in_suspend_bins[bin]);
+	}
+	return 0;
+}
+
+static int suspend_time_debug_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, suspend_time_debug_show, NULL);
+}
+
+static const struct file_operations suspend_time_debug_fops = {
+	.open       = suspend_time_debug_open,
+	.read       = seq_read,
+	.llseek     = seq_lseek,
+	.release    = single_release,
+};
+
+static int __init suspend_time_debug_init(void)
+{
+	struct dentry *d;
+
+	d = debugfs_create_file("suspend_time", 0755, NULL, NULL,
+			&suspend_time_debug_fops);
+	if (!d) {
+		pr_err("Failed to create suspend_time debug file\n");
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+late_initcall(suspend_time_debug_init);
+
+static char *earlysuspend_wq_step_name(enum earlysuspend_wq_stat_step step)
+{
+	switch (step) {
+	case EARLYSUSPEND_START:
+		return "earlysuspend_start";
+	case EARLYSUSPEND_MUTEXLOCK:
+		return "earlysuspend_mutexlock";
+	case EARLYSUSPEND_CHAINSTART:
+		return "earlysuspend_chainstart";
+	case EARLYSUSPEND_CHAINDONE:
+		return "earlysuspend_chaindone";
+	case EARLYSUSPEND_MUTEXUNLOCK:
+		return "earlysuspend_mutexunlock";
+	case EARLYSUSPEND_SYNCDONE:
+		return "earlysuspend_syncdone";
+	case EARLYSUSPEND_END:
+		return "earlysuspend_end";
+	default:
+		return "";
+	}
+}
+
+static char *lateresume_wq_step_name(enum lateresume_wq_stat_step step)
+{
+	switch (step) {
+	case LATERESUME_START:
+		return "lateresume_start";
+	case LATERESUME_MUTEXLOCK:
+		return "lateresume_mutexlock";
+	case LATERESUME_CHAINSTART:
+		return "lateresume_chainstart";
+	case LATERESUME_CHAINDONE:
+		return "lateresume_chaindone";
+	case LATERESUME_END:
+		return "lateresume_end";
+	default:
+		return "";
+	}
+}
+
+static char *suspend_wq_step_name(enum suspend_wq_stat_step step)
+{
+	switch (step) {
+	case SUSPEND_START:
+		return "suspend_start";
+	case SUSPEND_ENTERSUSPEND:
+		return "suspend_entersuspend";
+	case SUSPEND_EXITSUSPEND:
+		return "suspend_exitsuspend";
+	case SUSPEND_EXITDONE:
+		return "suspend_done";
+	default:
+		return "";
+	}
+}
+
+static char *suspend_wq_name(enum suspend_wq_num num)
+{
+	switch (num) {
+	case LATERESUME_WQ:
+		return "lateresume_wq";
+	case EARLYSUSPEND_WQ:
+		return "earlysuspend_wq";
+	case SUSPEND_WQ:
+		return "suspend_wq";
+	default:
+		return "";
+	}
+}
+
+static int earlysuspend_stats_show(struct seq_file *s, void *unused)
+{
+	if (suspend_wq_stats.lateresume_stat != LATERESUME_END)
+		suspend_wq_stats.failed_wq = LATERESUME_WQ;
+	if (suspend_wq_stats.earlysuspend_stat != EARLYSUSPEND_END)
+		suspend_wq_stats.failed_wq = EARLYSUSPEND_WQ;
+	if (suspend_wq_stats.suspend_stat != SUSPEND_EXITDONE)
+		suspend_wq_stats.failed_wq = SUSPEND_WQ;
+	seq_printf(s, "failed wq : %s\n",
+			suspend_wq_name(suspend_wq_stats.failed_wq));
+	seq_printf(s, "cur earlysuspend_wq step: %s\n",
+			earlysuspend_wq_step_name(suspend_wq_stats.earlysuspend_stat));
+	seq_printf(s, "cur lateresume_wq step: %s\n",
+			lateresume_wq_step_name(suspend_wq_stats.lateresume_stat));
+	seq_printf(s, "cur suspend_wq step: %s\n",
+			suspend_wq_step_name(suspend_wq_stats.suspend_stat));
+	seq_printf(s, "last lateresume call: %s\n",
+			suspend_wq_stats.last_lateresume_call);
+	seq_printf(s, "last earlysuspend call: %s\n",
+			suspend_wq_stats.last_earlysuspend_call);
+
+	return 0;
+}
+
+static int earlysuspend_stats_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, earlysuspend_stats_show, NULL);
+}
+
+static const struct file_operations suspend_stats_operations = {
+	.open           = earlysuspend_stats_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release        = single_release,
+};
+
+static int __init earlysuspend_debugfs_init(void)
+{
+	debugfs_create_file("earlysuspend_stats", S_IFREG | S_IRUGO,
+			NULL, NULL, &suspend_stats_operations);
+	return 0;
+}
+
+late_initcall(earlysuspend_debugfs_init);
+
+#endif
+#endif
+
+#ifdef CONFIG_MACH_LGE
+struct suspend_wq_stats suspend_wq_stats;
+#endif
 
 core_initcall(wakelocks_init);
 module_exit(wakelocks_exit);

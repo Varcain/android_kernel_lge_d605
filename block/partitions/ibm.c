@@ -1,9 +1,9 @@
 /*
- * File...........: linux/fs/partitions/ibm.c
- * Author(s)......: Holger Smolinski <Holger.Smolinski@de.ibm.com>
- *                  Volker Sameske <sameske@de.ibm.com>
- * Bugreports.to..: <Linux390@de.ibm.com>
- * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
+                                             
+                                                                  
+                                                       
+                                         
+                                                                   
  */
 
 #include <linux/buffer_head.h>

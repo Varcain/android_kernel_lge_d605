@@ -32,14 +32,31 @@
 #include "diagfwd_hsic.h"
 #include "diagfwd_smux.h"
 
-#define READ_HSIC_BUF_SIZE 2048
+#ifdef CONFIG_LGE_USB_DIAG_DISABLE
+#include "diag_lock.h"
+static int diag_enable = DIAG_DISABLE;
+void diagfwd_hsic_enable(int enable)
+{
+    diag_enable = enable;
+}
+EXPORT_SYMBOL(diagfwd_hsic_enable);
+#endif
 
+#define READ_HSIC_BUF_SIZE 2048
 static void diag_read_hsic_work_fn(struct work_struct *work)
 {
 	unsigned char *buf_in_hsic = NULL;
 	int num_reads_submitted = 0;
 	int err = 0;
 	int write_ptrs_available;
+
+#ifdef CONFIG_LGE_USB_DIAG_DISABLE
+	if(diag_enable == 0)
+	{
+		pr_debug("diag: [diag_read_hsic_work_fn] mdm_diag diabled\n");
+		return;
+	}
+#endif
 
 	if (!driver->hsic_ch) {
 		pr_err("DIAG in %s: driver->hsic_ch == 0\n", __func__);
@@ -524,6 +541,14 @@ static void diag_read_mdm_work_fn(struct work_struct *work)
 		usb_diag_read(driver->mdm_ch, driver->usb_read_mdm_ptr);
 		return;
 	}
+
+#ifdef CONFIG_LGE_USB_DIAG_DISABLE
+	if (diag_enable == 0)
+	{
+		pr_debug("diag: [diag_read_mdm_work_fn] mdm_diag diabled\n");
+		return;
+	}
+#endif
 
 	/* if SMUX not enabled, check for HSIC */
 	if (!driver->hsic_ch) {

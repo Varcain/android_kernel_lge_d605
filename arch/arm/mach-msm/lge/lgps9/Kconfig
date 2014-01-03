@@ -1,0 +1,11 @@
+config BOARD_HEADER_FILE
+	string "LGE board specific header file name"
+	default ""
+
+config MACH_MSM8930_LGPS9
+	depends on ARCH_MSM8930
+	select MACH_LGE
+	bool "MSM8930 LGPS9"
+	help
+	  Support for the LGE MSM8930 LGPS9 device.
+

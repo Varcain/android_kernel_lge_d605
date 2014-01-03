@@ -448,3 +448,37 @@ config SND_SOC_TPA6130A2
 
 config SND_SOC_MSM_STUB
 	tristate
+# CONFIG_LGE_AUDIO	2011.01..tarzan.park@lge.com
+config LGE_AUDIO
+	default n
+	bool "LGE Audio Configuration"
+	help
+		LGE AUDIO Configuration
+# Audio driver configuration
+
+config LGE_MicBias_EXT_CAPLESS_MODE
+	default n
+	bool "LGE Audio WCD9304 MicBias External Capless Mode"
+	help
+		LGE AUDIO Configuration-WCD9304 MicBias Capless Mode
+# Audio driver configuration
+
+config LGE_Headset_MicBias_2_7V
+	default n
+	bool "LGE Audio WCD9304 LGE_Headset_MicBias_2_7V"
+	help
+		LGE AUDIO Configuration-WCD9304 LGE_Headset_MicBias_2_7V
+# Audio driver configuration
+
+config LGE_CODEC_DEC2_TXT
+	default n
+	bool "LGE Audio WCD9304 Codec DEC2 Register Texting Enable"
+	help
+		LGE AUDIO Configuration-WCD9304 Codec DEC2 Register Texting Enable
+# Audio driver configuration
+
+config LGE_AUDIO_TPA2028D
+    bool "Audio subsystem TPA2028D"
+    default n
+    ---help---
+        Texas Instruments 3W Mono Class-D Audio Amplifier

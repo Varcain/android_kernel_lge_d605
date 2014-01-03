@@ -42,3 +42,6 @@ obj-$(CONFIG_BACKLIGHT_88PM860X) += 88pm860x_bl.o
 obj-$(CONFIG_BACKLIGHT_PCF50633)	+= pcf50633-backlight.o
 obj-$(CONFIG_BACKLIGHT_AAT2870) += aat2870_bl.o
 obj-$(CONFIG_BACKLIGHT_OT200) += ot200_bl.o
+#LGE_CHANGE_S [koh.euije@lge.com] Backlight for L9II REV
+obj-$(CONFIG_BACKLIGHT_LM3639)	+= lm3639_bl.o
+#LGE_CHANGE_S [koh.euije@lge.com] Backlight for L9II REV

@@ -25,6 +25,39 @@
    and provided to the battery driver in the units desired for
    their framework which is 0.1DegC. True resolution of 0.1DegC
    will result in the below table size to increase by 10 times */
+#if CONFIG_MACH_MSM8930_FX3
+#ifdef CONFIG_MACH_LGE_FX3_VZW
+static const struct pm8xxx_adc_map_pt adcmap_btm_threshold[] = {
+	{-300, 1684},
+	{-200, 1554},
+	{-100, 1382},
+	{0,    1181},
+	{100,  1005},
+	{200,   818},
+	{300,   677},
+	{400,   569},
+	{500,   485},
+	{600,   390},
+	{700,    350},
+	{800,    336}
+};
+#else
+static const struct pm8xxx_adc_map_pt adcmap_btm_threshold[] = {
+	{-300, 1684},
+	{-200, 1554},
+	{-100, 1382},
+	{0,    1181},
+	{100,  1005},
+	{200,   818},
+	{300,   677},
+	{400,   569},
+	{500,   485},
+	{600,   422},
+	{700,    367},
+	{800,    336}
+};
+#endif
+#else
 static const struct pm8xxx_adc_map_pt adcmap_btm_threshold[] = {
 	{-300,	1642},
 	{-200,	1544},
@@ -110,6 +143,7 @@ static const struct pm8xxx_adc_map_pt adcmap_btm_threshold[] = {
 	{780,	208},
 	{790,	203}
 };
+#endif
 
 static const struct pm8xxx_adc_map_pt adcmap_pa_therm[] = {
 	{1731,	-30},

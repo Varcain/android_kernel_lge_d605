@@ -1,29 +1,29 @@
-/* lasi_82596.c -- driver for the intel 82596 ethernet controller, as
-   munged into HPPA boxen .
+/*                                                                   
+                           
 
-   This driver is based upon 82596.c, original credits are below...
-   but there were too many hoops which HP wants jumped through to
-   keep this code in there in a sane manner.
+                                                                   
+                                                                 
+                                            
 
-   3 primary sources of the mess --
-   1) hppa needs *lots* of cacheline flushing to keep this kind of
-   MMIO running.
+                                   
+                                                                  
+                
 
-   2) The 82596 needs to see all of its pointers as their physical
-   address.  Thus virt_to_bus/bus_to_virt are *everywhere*.
+                                                                  
+                                                           
 
-   3) The implementation HP is using seems to be significantly pickier
-   about when and how the command and RX units are started.  some
-   command ordering was changed.
+                                                                      
+                                                                 
+                                
 
-   Examination of the mach driver leads one to believe that there
-   might be a saner way to pull this off...  anyone who feels like a
-   full rewrite can be my guest.
+                                                                 
+                                                                    
+                                
 
-   Split 02/13/2000 Sam Creasey (sammy@oh.verio.com)
+                                                    
 
-   02/01/2000  Initial modifications for parisc by Helge Deller (deller@gmx.de)
-   03/02/2000  changes for better/correct(?) cache-flushing (deller)
+                                                                               
+                                                                    
 */
 
 /* 82596.c: A generic 82596 ethernet driver for linux. */

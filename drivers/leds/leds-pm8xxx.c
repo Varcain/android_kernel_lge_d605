@@ -23,7 +23,14 @@
 
 #include <linux/mfd/pm8xxx/core.h>
 #include <linux/mfd/pm8xxx/pwm.h>
+
 #include <linux/leds-pm8xxx.h>
+
+#if defined(CONFIG_MACH_MSM8930_LGPS9) || defined(CONFIG_MACH_MSM8930_FX3)
+#include <linux/mfd/pm8xxx/pm8038.h>
+#include "../../../arch/arm/mach-msm/lge/fx3/board-fx3.h"
+#include "../../../arch/arm/mach-msm/include/mach/board_lge.h"
+#endif
 
 #define SSBI_REG_ADDR_DRV_KEYPAD	0x48
 #define PM8XXX_DRV_KEYPAD_BL_MASK	0xf0
@@ -118,6 +125,60 @@
 
 #define PM8XXX_LED_PWM_FLAGS	(PM_PWM_LUT_LOOP | PM_PWM_LUT_RAMP_UP)
 
+#define UI_MIN_BL		20
+#define UI_20_BL	68
+#define UI_40_BL	116
+#define UI_DEFAULT_BL		149
+#define UI_60_BL	162
+#define UI_80_BL	208
+#define UI_MAX_BL		255
+
+#define LGE_MIN_BL		20
+#define LGE_20_BL	27
+#define LGE_40_BL	50
+#define LGE_DEFAULT_BL		92
+#define LGE_60_BL	93
+#define LGE_80_BL	159
+#define LGE_MAX_BL		255
+
+
+/*                                                         */
+#ifdef CONFIG_LGE_PM8038_KPJT
+struct pm8xxx_led_data *red_led = NULL;
+struct pm8xxx_led_data *green_led = NULL;
+struct pm8xxx_led_data *blue_led = NULL;
+
+#define RED_CHANNEL   5
+#define GREEN_CHANNEL 4
+#define BLUE_CHANNEL  3
+
+extern void change_led_pattern(int pattern, int pattern_r_on, int pattern_g_on, int pattern_b_on);
+extern void make_pwm_led_pattern(int patterns[]);
+extern void make_blink_led_pattern(int red, int green, int blue, int delay_on, int delay_off, int on);
+extern void pattern_test(int on);
+
+#else
+#endif
+/*                                                         */
+
+#if defined(CONFIG_MACH_MSM8930_LGPS9) || defined(CONFIG_MACH_MSM8930_FX3)
+#define LED_MAP(_version, _kb, _led0, _led1, _led2, _flash_led0, _flash_led1, \
+	_wled, _rgb_led_red, _rgb_led_green, _rgb_led_blue, _mpp_kb, _mpp_qwerty)\
+	{\
+		.version = _version,\
+		.supported = _kb << PM8XXX_ID_LED_KB_LIGHT | \
+			_led0 << PM8XXX_ID_LED_0 | _led1 << PM8XXX_ID_LED_1 | \
+			_led2 << PM8XXX_ID_LED_2  | \
+			_flash_led0 << PM8XXX_ID_FLASH_LED_0 | \
+			_flash_led1 << PM8XXX_ID_FLASH_LED_1 | \
+			_wled << PM8XXX_ID_WLED | \
+			_rgb_led_red << PM8XXX_ID_RGB_LED_RED | \
+			_rgb_led_green << PM8XXX_ID_RGB_LED_GREEN | \
+			_rgb_led_blue << PM8XXX_ID_RGB_LED_BLUE | \
+			_mpp_kb << PM8XXX_ID_MPP_KB_LIGHT | \
+			_mpp_qwerty << PM8XXX_ID_MPP_QWERTY \
+	}
+#else
 #define LED_MAP(_version, _kb, _led0, _led1, _led2, _flash_led0, _flash_led1, \
 	_wled, _rgb_led_red, _rgb_led_green, _rgb_led_blue)\
 	{\
@@ -130,9 +191,9 @@
 			_wled << PM8XXX_ID_WLED | \
 			_rgb_led_red << PM8XXX_ID_RGB_LED_RED | \
 			_rgb_led_green << PM8XXX_ID_RGB_LED_GREEN | \
-			_rgb_led_blue << PM8XXX_ID_RGB_LED_BLUE, \
+			_rgb_led_blue << PM8XXX_ID_RGB_LED_BLUE | \
 	}
-
+#endif
 /**
  * supported_leds - leds supported for each PMIC version
  * @version - version of PMIC
@@ -144,13 +205,32 @@ struct supported_leds {
 	u32 supported;
 };
 
+
 static const struct supported_leds led_map[] = {
+#if defined(CONFIG_MACH_MSM8930_LGPS9) || defined(CONFIG_MACH_MSM8930_FX3)
+	LED_MAP(PM8XXX_VERSION_8058, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0),
+	LED_MAP(PM8XXX_VERSION_8921, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0),
+	LED_MAP(PM8XXX_VERSION_8018, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
+	LED_MAP(PM8XXX_VERSION_8922, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0),
+//                                                                  
+#if defined(CONFIG_BACKLIGHT_LM3639)  
+	LED_MAP(PM8XXX_VERSION_8038, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1),
+#else
+	LED_MAP(PM8XXX_VERSION_8038, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1),
+#endif
+//                                                                   
+#else
 	LED_MAP(PM8XXX_VERSION_8058, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0),
 	LED_MAP(PM8XXX_VERSION_8921, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0),
 	LED_MAP(PM8XXX_VERSION_8018, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0),
 	LED_MAP(PM8XXX_VERSION_8922, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1),
 	LED_MAP(PM8XXX_VERSION_8038, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1),
+#endif
 };
+
+#if defined(CONFIG_MACH_MSM8930_LGPS9) || defined(CONFIG_MACH_MSM8930_FX3)
+static int mpp_level = PM8XXX_MPP_CS_OUT_5MA;
+#endif
 
 /**
  * struct pm8xxx_led_data - internal led data structure
@@ -179,6 +259,19 @@ struct pm8xxx_led_data {
 	struct wled_config_data *wled_cfg;
 	int			max_current;
 };
+
+#if defined(CONFIG_MACH_MSM8930_LGPS9) || defined(CONFIG_MACH_MSM8930_FX3)
+static inline int pm8xxx_mpp_config_current_sink(unsigned mpp,
+												 unsigned level, unsigned control)
+{
+	struct pm8xxx_mpp_config_data config = {
+		.type = PM8XXX_MPP_TYPE_SINK,
+		.level = level,
+		.control = control,
+	};
+	return pm8xxx_mpp_config(mpp, &config);
+}
+#endif
 
 static void led_kp_set(struct pm8xxx_led_data *led, enum led_brightness value)
 {
@@ -242,11 +335,43 @@ led_flash_set(struct pm8xxx_led_data *led, enum led_brightness value)
 			 led->id, rc);
 }
 
+#if defined ( CONFIG_FB_MSM_MIPI_TX11D108VM_R69324A_VIDEO_QHD_PT )	
+int debug_lcd_backlight_level[15] = {-1, -1, -1, -1,-1, -1,-1, -1,-1, -1,-1,-1, -1,-1, -1,};
+int debug_lcd_backlight_cnt = 0;
+#endif
+
 static int
 led_wled_set(struct pm8xxx_led_data *led, enum led_brightness value)
 {
 	int rc, duty;
 	u8 val, i, num_wled_strings;
+	static int old_value = 0;
+
+#if defined ( CONFIG_FB_MSM_MIPI_TX11D108VM_R69324A_VIDEO_QHD_PT )	
+	if (debug_lcd_backlight_cnt < 10){
+		debug_lcd_backlight_level[debug_lcd_backlight_cnt] = value;
+		debug_lcd_backlight_cnt++;
+	}
+#endif
+	if(old_value == 0 || value == 0)
+		dev_err(led->dev->parent, "wled brightness value is %d\n", value);
+
+	old_value = value;
+	if ((value < 0) || (val > UI_MAX_BL))
+		return  -EINVAL;
+
+	if(value >= UI_MIN_BL && value <= UI_20_BL)
+		value = (value - UI_MIN_BL) * (LGE_20_BL - LGE_MIN_BL) / (UI_20_BL - UI_MIN_BL) + LGE_MIN_BL;
+	else if(value >UI_20_BL && value <= UI_40_BL)
+		value = (value - UI_20_BL) * (LGE_40_BL - LGE_20_BL) / (UI_40_BL - UI_20_BL) + LGE_20_BL;
+	else if(value >UI_40_BL && value <= UI_DEFAULT_BL)
+		value = (value - UI_40_BL) * (LGE_DEFAULT_BL - LGE_40_BL) / (UI_DEFAULT_BL - UI_40_BL) + LGE_40_BL;
+	else if(value >UI_DEFAULT_BL && value <= UI_60_BL)
+		value = (value - UI_DEFAULT_BL) * (LGE_60_BL - LGE_DEFAULT_BL) / (UI_60_BL - UI_DEFAULT_BL) + LGE_DEFAULT_BL;
+	else if(value >UI_60_BL && value <= UI_80_BL)
+		value = (value - UI_60_BL) * (LGE_80_BL - LGE_60_BL) / (UI_80_BL - UI_60_BL) + LGE_60_BL;
+	else if(value >UI_80_BL && value <= UI_MAX_BL)
+		value = (value - UI_80_BL) * (LGE_MAX_BL - LGE_80_BL) / (UI_MAX_BL - UI_80_BL) + LGE_80_BL;
 
 	if (value > WLED_MAX_LEVEL)
 		value = WLED_MAX_LEVEL;
@@ -429,6 +554,9 @@ static void __pm8xxx_led_work(struct pm8xxx_led_data *led,
 					enum led_brightness level)
 {
 	int rc;
+#if defined(CONFIG_MACH_MSM8930_LGPS9) || defined(CONFIG_MACH_MSM8930_FX3)
+	int mpp_num;
+#endif
 
 	mutex_lock(&led->lock);
 
@@ -455,6 +583,16 @@ static void __pm8xxx_led_work(struct pm8xxx_led_data *led,
 	case PM8XXX_ID_RGB_LED_BLUE:
 		led_rgb_set(led, level);
 		break;
+#if defined(CONFIG_MACH_MSM8930_LGPS9) || defined(CONFIG_MACH_MSM8930_FX3)
+	case PM8XXX_ID_MPP_KB_LIGHT:
+		mpp_num = PM8038_MPP_PM_TO_SYS(4);
+		pm8xxx_mpp_config_current_sink(mpp_num, mpp_level, level ? 1 : 0);
+		break;
+	case PM8XXX_ID_MPP_QWERTY:
+		mpp_num = PM8038_MPP_PM_TO_SYS(3);
+		pm8xxx_mpp_config_current_sink(mpp_num, mpp_level, level ? 1 : 0);
+		break;
+#endif
 	default:
 		dev_err(led->cdev.dev, "unknown led id %d", led->id);
 		break;
@@ -491,6 +629,15 @@ static void pm8xxx_led_set(struct led_classdev *led_cdev,
 		dev_err(led->cdev.dev, "Invalid brightness value exceeds");
 		return;
 	}
+#if defined(CONFIG_MACH_MSM8930_LGPS9) || defined(CONFIG_MACH_MSM8930_FX3)
+	if (led->id == PM8XXX_ID_MPP_KB_LIGHT
+			|| led->id == PM8XXX_ID_MPP_QWERTY) {
+			if (value > PM8XXX_MPP_CS_OUT_5MA)
+				mpp_level = PM8XXX_MPP_CS_OUT_5MA;
+			else
+				mpp_level = value;
+	}
+#endif
 
 	led->cdev.brightness = value;
 	schedule_work(&led->work);
@@ -542,6 +689,12 @@ static int pm8xxx_set_led_mode_and_max_brightness(struct pm8xxx_led_data *led,
 	case PM8XXX_ID_RGB_LED_BLUE:
 		led->cdev.max_brightness = LED_FULL;
 		break;
+#if defined(CONFIG_MACH_MSM8930_LGPS9) || defined(CONFIG_MACH_MSM8930_FX3)
+	case PM8XXX_ID_MPP_KB_LIGHT:
+	case PM8XXX_ID_MPP_QWERTY:
+		led->cdev.max_brightness = LED_FULL;
+		break;
+#endif
 	default:
 		dev_err(led->cdev.dev, "LED Id is invalid");
 		return -EINVAL;
@@ -571,6 +724,38 @@ static int __devinit init_wled(struct pm8xxx_led_data *led)
 		dev_err(led->dev->parent, "Invalid ovp value");
 		return -EINVAL;
 	}
+#if defined(CONFIG_MACH_LGE) /*to remove WLED audible noise */
+#if defined(CONFIG_MACH_LGE_FX3_VZW) || defined(CONFIG_MACH_LGE_FX3Q_TMUS) || defined (CONFIG_FB_MSM_MIPI_TX11D108VM_R69324A_VIDEO_QHD_PT)/*f6 models, At UI Brightness 0%, the screen is blinking*/
+	val = 0x00; // 800kHz
+#else
+	val = 0x10;
+#endif
+	rc = pm8xxx_writeb(led->dev->parent, 0x265, val);
+	if (rc) {
+		dev_err(led->dev->parent, "can't write wled ctrl12 config"
+			" register rc=%d\n", rc);
+		return rc;
+	}
+
+	val = 0x12;
+
+	rc = pm8xxx_writeb(led->dev->parent, WLED_OVP_CFG_REG, val);
+	if (rc) {
+		dev_err(led->dev->parent, "can't write wled ovp config"
+			" register rc=%d\n", rc);
+		return rc;
+	}
+
+	val = 0xff;
+
+	rc = pm8xxx_writeb(led->dev->parent, 0x268, val);
+	if (rc) {
+		dev_err(led->dev->parent, "can't write wled ctrl15 config"
+			" register rc=%d\n", rc);
+		return rc;
+	}
+
+#else
 
 	rc = pm8xxx_readb(led->dev->parent, WLED_OVP_CFG_REG, &val);
 	if (rc) {
@@ -588,6 +773,7 @@ static int __devinit init_wled(struct pm8xxx_led_data *led)
 			" register rc=%d\n", rc);
 		return rc;
 	}
+#endif
 
 	/* program current boost limit and output feedback*/
 	if (led->wled_cfg->boost_curr_lim > WLED_CURR_LIMIT_1680mA) {
@@ -765,6 +951,12 @@ static int __devinit get_init_value(struct pm8xxx_led_data *led, u8 *val)
 	case PM8XXX_ID_RGB_LED_BLUE:
 		addr = SSBI_REG_ADDR_RGB_CNTL1;
 		break;
+#if defined(CONFIG_MACH_MSM8930_LGPS9) || defined(CONFIG_MACH_MSM8930_FX3)
+	case PM8XXX_ID_MPP_KB_LIGHT:
+	case PM8XXX_ID_MPP_QWERTY:
+		addr = 0; /* temp add for unintialized warning */
+		break;
+#endif
 	default:
 		dev_err(led->cdev.dev, "unknown led id %d", led->id);
 		return -EINVAL;
@@ -777,13 +969,653 @@ static int __devinit get_init_value(struct pm8xxx_led_data *led, u8 *val)
 
 	return rc;
 }
+/*                                                         */
+#ifdef CONFIG_LGE_PM8038_KPJT
+void make_pwm_led_pattern(int patterns[])
+{
+	int i=0;
+	int *duty_pcts_red = NULL;
+	int *duty_pcts_green = NULL;
+	int *duty_pcts_blue =NULL;
+
+	// 1. set all leds brightness to 0
+	red_led->cdev.brightness = 0;
+	green_led->cdev.brightness = 0;
+	blue_led->cdev.brightness = 0;
+
+	// 2. run work-function, as brightness 0, all led turn off
+	pm8xxx_led_pwm_work(red_led);
+	pm8xxx_led_pwm_work(green_led);
+	pm8xxx_led_pwm_work(blue_led);
+
+		duty_pcts_red   = patterns; //red_led->pwm_duty_cycles->duty_pcts1;
+		duty_pcts_green = patterns; //green_led->pwm_duty_cycles->duty_pcts1;
+		duty_pcts_blue  = patterns; //blue_led->pwm_duty_cycles->duty_pcts1;
+
+
+	printk("[PMIC K-PJT] LUT is \n");
+	for(i=0;i<79;i++){
+		printk("%d ",duty_pcts_red[i]);
+	}
+	printk("\n");
+
+
+	// 4. lut disable, so we can edit LUT table after done this.
+	pm8xxx_pwm_lut_enable( red_led->pwm_dev, 0 );
+	pm8xxx_pwm_lut_enable( green_led->pwm_dev, 0 );
+	pm8xxx_pwm_lut_enable( blue_led->pwm_dev, 0 );
+
+	// 5. lut config(red led).
+	pm8xxx_pwm_lut_config(
+	red_led->pwm_dev,
+	duty_pcts_red[78],
+	&duty_pcts_red[duty_pcts_red[63]],
+	duty_pcts_red[65],
+	duty_pcts_red[63]+1,
+	duty_pcts_red[64],
+	0,
+	duty_pcts_red[66],
+	duty_pcts_red[75]
+	);
+	// 6. lut config(green led).
+	pm8xxx_pwm_lut_config(
+	green_led->pwm_dev,
+	duty_pcts_green[78],
+	&duty_pcts_green[duty_pcts_green[67]],
+	duty_pcts_green[69],
+	duty_pcts_green[67]+1,
+	duty_pcts_green[68],
+	0,
+	duty_pcts_green[70],
+	duty_pcts_green[76]
+	);
+	// 7. lut config(blue led).
+	pm8xxx_pwm_lut_config(
+	blue_led->pwm_dev,
+	duty_pcts_blue[78],
+	&duty_pcts_blue[duty_pcts_blue[71]],
+	duty_pcts_blue[73],
+	duty_pcts_blue[71]+1,
+	duty_pcts_blue[72],
+	0,
+	duty_pcts_blue[74],
+	duty_pcts_blue[77]
+	);
+
+	// 8. lut enable, so we can run led after done this.
+	pm8xxx_pwm_lut_enable( red_led->pwm_dev, 1 );
+	pm8xxx_pwm_lut_enable( green_led->pwm_dev, 1 );
+	pm8xxx_pwm_lut_enable( blue_led->pwm_dev, 1 );
+}
+
+void make_blink_led_pattern(int red, int green, int blue, int delay_on, int delay_off, int on){
+#if defined(CONFIG_MACH_LGE_FX3_VZW) || defined(CONFIG_MACH_LGE_FX3Q_TMUS) 
+	int *duty_pcts_red = NULL;
+
+	int count_on =0;
+	int count_off =0;
+	int duty_ms = 0;
+
+	int i,j = 0;
+
+	// 1. set all leds brightness to 0
+	red_led->cdev.brightness = 0;
+
+	// 2. run work-function, as brightness 0, all led turn off
+	pm8xxx_led_pwm_work(red_led);
+
+	if(on) {
+		// 3. change LUT structure.
+		// and we use duty_pcts17 for blink led.
+		duty_pcts_red   = red_led->pwm_duty_cycles->duty_pcts17;
+
+		//4. calculate count_on/count_off/duty_ms
+		count_on= 63*delay_on/(delay_on+delay_off);
+		count_off=63-count_on;
+	    duty_ms = (delay_on+delay_off)/63;
+
+		if(delay_on>100000){
+			count_on= 63;
+			count_off=0;
+		    duty_ms = 100;
+		}
+
+		printk("[PMIC-KPJT] RED=%d, GREEN=%d, BLUE=%d, ON=%d,OFF=%d,ENABLE=%d\n",red,green,blue,delay_on,delay_off,on);
+		printk("[PMIC-KPJT] COUNT_ON=%d, COUNT_OFF=%d, DUTY_MS=%d\n",count_on,count_off,duty_ms);
+
+		//5. make blink LUT Table
+		//RED
+		for(i=0;i<63;i++){
+			if(j<count_on){
+				duty_pcts_red[i]=red;
+				j++;
+			} else {
+				duty_pcts_red[i]=0;
+			}
+		}
+
+		printk("[PMIC K-PJT] BLINK ONLY LED LUT is \n");
+		for(i=0;i<63;i++){
+			printk("%d ",duty_pcts_red[i]);
+		}
+		printk("\n");
+
+
+		// 6. lut disable, so we can edit LUT table after done this.
+		pm8xxx_pwm_lut_enable( red_led->pwm_dev, 0 );
+
+		// 7. lut config(red led).
+		/**
+		 * pm8xxx_pwm_lut_config - change a PWM device configuration to use LUT
+		 * @pwm: the PWM device
+		 * @period_us: period in microseconds
+		 * @duty_pct: arrary of duty cycles in percent, like 20, 50.
+		 * @duty_time_ms: time for each duty cycle in milliseconds
+		 * @start_idx: start index in lookup table from 0 to MAX-1
+		 * @idx_len: number of index
+		 * @pause_lo: pause time in milliseconds at low index
+		 * @pause_hi: pause time in milliseconds at high index
+		 * @flags: control flags
+		 */
+		pm8xxx_pwm_lut_config(
+		red_led->pwm_dev,
+		2000,					//period_us
+		&duty_pcts_red[0],		//duty_pct
+		duty_ms,				//duty_time_ms
+		1,						//start_idx
+		63,						//idx_len
+		0,						//pause_lo
+		0,						//pause_hi
+		3						//flags
+		);
+
+		// 10. lut enable, so we can run led after done this.
+		pm8xxx_pwm_lut_enable( red_led->pwm_dev, 1 );
+
+		// 11. set all leds brightness to 255
+		red_led->cdev.brightness = 255;
+
+		// 12. run work-function, as brightness 255, all led turn on
+		pm8xxx_led_pwm_work(red_led);
+	} else {
+		//led already turned off.
+		//So what to do? kk.
+	}
+
+#else
+	int *duty_pcts_red = NULL;
+	int *duty_pcts_green = NULL;
+	int *duty_pcts_blue =NULL;
+	
+	int count_on =0;
+	int count_off =0;
+	int duty_ms = 0;
+
+	int i,j = 0;
+
+	// 1. set all leds brightness to 0
+	red_led->cdev.brightness = 0;
+	green_led->cdev.brightness = 0;
+	blue_led->cdev.brightness = 0;
+
+	// 2. run work-function, as brightness 0, all led turn off
+	pm8xxx_led_pwm_work(red_led);
+	pm8xxx_led_pwm_work(green_led);
+	pm8xxx_led_pwm_work(blue_led);
+
+if(on){
+	// 3. change LUT structure.
+	// and we use duty_pcts17 for blink led.
+	duty_pcts_red   = red_led->pwm_duty_cycles->duty_pcts17;
+	duty_pcts_green = green_led->pwm_duty_cycles->duty_pcts17;
+	duty_pcts_blue  = blue_led->pwm_duty_cycles->duty_pcts17;
+
+	//4. calculate count_on/count_off/duty_ms
+	count_on= 21*delay_on/(delay_on+delay_off);
+	count_off=21-count_on;
+    duty_ms = (delay_on+delay_off)/21;
+
+	if(delay_on>100000){
+	count_on= 21;
+	count_off=0;
+    duty_ms = 100;
+
+	}
+
+
+	printk("[PMIC-KPJT] RED=%d, GREEN=%d, BLUE=%d, ON=%d,OFF=%d,ENABLE=%d\n",red,green,blue,delay_on,delay_off,on);
+	printk("[PMIC-KPJT] COUNT_ON=%d, COUNT_OFF=%d, DUTY_MS=%d\n",count_on,count_off,duty_ms);
+
+	//5. make blink LUT Table
+	//RED
+	for(i=0;i<21;i++){
+		if(j<count_on){
+			duty_pcts_red[i]=red;
+			j++;
+		}else{
+			duty_pcts_red[i]=0;
+		}
+	}
+	j=0;
+	//GREEN
+	for(i=21;i<42;i++){
+		if(j<count_on){
+			duty_pcts_green[i]=green;
+			j++;
+		}else{
+			duty_pcts_green[i]=0;
+		}
+	}
+	j=0;
+	//BLUE
+	for(i=42;i<63;i++){
+		if(j<count_on){
+			duty_pcts_blue[i]=blue;
+			j++;
+		}else{
+			duty_pcts_blue[i]=0;
+		}
+	}
+	j=0;
+	printk("[PMIC K-PJT] BLINK ONLY LED LUT is \n");
+	for(i=0;i<63;i++){
+		printk("%d ",duty_pcts_red[i]);
+	}
+	printk("\n");
+
+
+	// 6. lut disable, so we can edit LUT table after done this.
+	pm8xxx_pwm_lut_enable( red_led->pwm_dev, 0 );
+	pm8xxx_pwm_lut_enable( green_led->pwm_dev, 0 );
+	pm8xxx_pwm_lut_enable( blue_led->pwm_dev, 0 );
+
+	// 7. lut config(red led).
+	/**
+	 * pm8xxx_pwm_lut_config - change a PWM device configuration to use LUT
+	 * @pwm: the PWM device
+	 * @period_us: period in microseconds
+	 * @duty_pct: arrary of duty cycles in percent, like 20, 50.
+	 * @duty_time_ms: time for each duty cycle in milliseconds
+	 * @start_idx: start index in lookup table from 0 to MAX-1
+	 * @idx_len: number of index
+	 * @pause_lo: pause time in milliseconds at low index
+	 * @pause_hi: pause time in milliseconds at high index
+	 * @flags: control flags
+	 */
+	pm8xxx_pwm_lut_config(
+	red_led->pwm_dev,
+	2000,					//period_us
+	&duty_pcts_red[0],		//duty_pct
+	duty_ms,				//duty_time_ms
+	1,						//start_idx
+	21,						//idx_len
+	0,						//pause_lo
+	0,						//pause_hi
+	3						//flags
+	);
+	// 8. lut config(green led).
+	pm8xxx_pwm_lut_config(
+	green_led->pwm_dev,
+	2000,					//period_us
+	&duty_pcts_red[21],		//duty_pct
+	duty_ms,				//duty_time_ms
+	22,						//start_idx
+	21,						//idx_len
+	0,						//pause_lo
+	0,						//pause_hi
+	3						//flags
+	);
+	// 9. lut config(blue led).
+	pm8xxx_pwm_lut_config(
+	blue_led->pwm_dev,
+	2000,					//period_us
+	&duty_pcts_red[42],		//duty_pct
+	duty_ms,				//duty_time_ms
+	43,						//start_idx
+	21,						//idx_len
+	0,						//pause_lo
+	0,						//pause_hi
+	3						//flags
+	);
+
+
+
+	// 10. lut enable, so we can run led after done this.
+	pm8xxx_pwm_lut_enable( red_led->pwm_dev, 1 );
+	pm8xxx_pwm_lut_enable( green_led->pwm_dev, 1 );
+	pm8xxx_pwm_lut_enable( blue_led->pwm_dev, 1 );
+
+	// 11. set all leds brightness to 255
+	red_led->cdev.brightness = 255;
+	green_led->cdev.brightness = 255;
+	blue_led->cdev.brightness = 255;
+
+	// 12. run work-function, as brightness 255, all led turn on
+	pm8xxx_led_pwm_work(red_led);
+	pm8xxx_led_pwm_work(green_led);
+	pm8xxx_led_pwm_work(blue_led);
+}else{
+	//led already turned off.
+	//So what to do? kk.
+}
+#endif
+}
+
+void pattern_test(int pattern_on)
+{
+
+		red_led->cdev.brightness = 0;
+		green_led->cdev.brightness = 0;
+		blue_led->cdev.brightness = 0;
+
+		pm8xxx_led_pwm_work(red_led);
+		pm8xxx_led_pwm_work(green_led);
+		pm8xxx_led_pwm_work(blue_led);
+		if(pattern_on==1){
+			printk("[PMIC K-PJT] test pattern red is ON!! \n");
+			red_led->cdev.brightness = 255;
+			green_led->cdev.brightness = 0;
+			blue_led->cdev.brightness = 0;
+
+			pm8xxx_led_pwm_work(red_led);
+			pm8xxx_led_pwm_work(green_led);
+			pm8xxx_led_pwm_work(blue_led);
+		}else if(pattern_on==2){
+			printk("[PMIC K-PJT] test pattern green is ON!! \n");
+			red_led->cdev.brightness = 0;
+			green_led->cdev.brightness = 255;
+			blue_led->cdev.brightness = 0;
+			pm8xxx_led_pwm_work(red_led);
+			pm8xxx_led_pwm_work(green_led);
+			pm8xxx_led_pwm_work(blue_led);
+		}else if(pattern_on==3){
+			printk("[PMIC K-PJT] test pattern blue is ON!! \n");
+			red_led->cdev.brightness = 0;
+			green_led->cdev.brightness = 0;
+			blue_led->cdev.brightness = 255;
+			pm8xxx_led_pwm_work(red_led);
+			pm8xxx_led_pwm_work(green_led);
+			pm8xxx_led_pwm_work(blue_led);
+		}else if(pattern_on==4){
+			printk("[PMIC K-PJT] test pattern red+green is ON!! \n");
+			red_led->cdev.brightness = 255;
+			green_led->cdev.brightness = 255;
+			blue_led->cdev.brightness = 0;
+			pm8xxx_led_pwm_work(red_led);
+			pm8xxx_led_pwm_work(green_led);
+			pm8xxx_led_pwm_work(blue_led);
+		}else if(pattern_on==5){
+			printk("[PMIC K-PJT] test pattern red+blue is ON!! \n");
+			red_led->cdev.brightness = 255;
+			green_led->cdev.brightness = 0;
+			blue_led->cdev.brightness = 255;
+			pm8xxx_led_pwm_work(red_led);
+			pm8xxx_led_pwm_work(green_led);
+			pm8xxx_led_pwm_work(blue_led);
+		}else if(pattern_on==6){
+			printk("[PMIC K-PJT] test pattern green+blue is ON!! \n");
+			red_led->cdev.brightness = 0;
+			green_led->cdev.brightness = 255;
+			blue_led->cdev.brightness = 255;
+			pm8xxx_led_pwm_work(red_led);
+			pm8xxx_led_pwm_work(green_led);
+			pm8xxx_led_pwm_work(blue_led);
+		}else if(pattern_on==7){
+			printk("[PMIC K-PJT] test pattern red+green+blue is ON!! \n");
+			red_led->cdev.brightness = 255;
+			green_led->cdev.brightness = 255;
+			blue_led->cdev.brightness = 255;
+			pm8xxx_led_pwm_work(red_led);
+			pm8xxx_led_pwm_work(green_led);
+			pm8xxx_led_pwm_work(blue_led);
+		}else{
+			printk("[PMIC K-PJT] test pattern red+green+blue is OFF!! \n");
+			red_led->cdev.brightness = 0;
+			green_led->cdev.brightness = 0;
+			blue_led->cdev.brightness = 0;
+			pm8xxx_led_pwm_work(red_led);
+			pm8xxx_led_pwm_work(green_led);
+			pm8xxx_led_pwm_work(blue_led);
+		}
+
+}
+void change_led_pattern (int pattern, int pattern_r_on, int pattern_g_on, int pattern_b_on )
+{
+
+    int i =0;
+
+	int *duty_pcts_red = NULL;
+	int *duty_pcts_green = NULL;
+	int *duty_pcts_blue =NULL;
+	
+	// 1. set all leds brightness to 0
+	red_led->cdev.brightness = 0;
+	green_led->cdev.brightness = 0;
+	blue_led->cdev.brightness = 0;
+
+	// 2. run work-function, as brightness 0, all led turn off
+	pm8xxx_led_pwm_work(red_led);
+	pm8xxx_led_pwm_work(green_led);
+	pm8xxx_led_pwm_work(blue_led);
+
+	if(pattern_r_on|pattern_g_on|pattern_b_on){
+	// 3. change LUT structure in platform device.
+	switch (pattern) {
+
+	case 1:
+		duty_pcts_red   = red_led->pwm_duty_cycles->duty_pcts1;
+		duty_pcts_green = green_led->pwm_duty_cycles->duty_pcts1;
+		duty_pcts_blue  = blue_led->pwm_duty_cycles->duty_pcts1;
+		break;
+
+	case 2:
+		duty_pcts_red   = red_led->pwm_duty_cycles->duty_pcts2;
+		duty_pcts_green = green_led->pwm_duty_cycles->duty_pcts2;
+		duty_pcts_blue  = blue_led->pwm_duty_cycles->duty_pcts2;
+		break;
+
+	case 3:
+		duty_pcts_red   = red_led->pwm_duty_cycles->duty_pcts3;
+		duty_pcts_green = green_led->pwm_duty_cycles->duty_pcts3;
+		duty_pcts_blue  = blue_led->pwm_duty_cycles->duty_pcts3;
+		break;
+
+	case 4:
+		duty_pcts_red   = red_led->pwm_duty_cycles->duty_pcts4;
+		duty_pcts_green = green_led->pwm_duty_cycles->duty_pcts4;
+		duty_pcts_blue  = blue_led->pwm_duty_cycles->duty_pcts4;
+		break;
+
+	case 5:
+		duty_pcts_red   = red_led->pwm_duty_cycles->duty_pcts5;
+		duty_pcts_green = green_led->pwm_duty_cycles->duty_pcts5;
+		duty_pcts_blue  = blue_led->pwm_duty_cycles->duty_pcts5;
+		break;
+
+	case 6:
+		duty_pcts_red   = red_led->pwm_duty_cycles->duty_pcts6;
+		duty_pcts_green = green_led->pwm_duty_cycles->duty_pcts6;
+		duty_pcts_blue  = blue_led->pwm_duty_cycles->duty_pcts6;
+		break;
+
+	case 7:
+		duty_pcts_red   = red_led->pwm_duty_cycles->duty_pcts7;
+		duty_pcts_green = green_led->pwm_duty_cycles->duty_pcts7;
+		duty_pcts_blue  = blue_led->pwm_duty_cycles->duty_pcts7;
+		break;
+
+	case 8:
+		duty_pcts_red   = red_led->pwm_duty_cycles->duty_pcts8;
+		duty_pcts_green = green_led->pwm_duty_cycles->duty_pcts8;
+		duty_pcts_blue  = blue_led->pwm_duty_cycles->duty_pcts8;
+		break;
+
+	case 9:
+		duty_pcts_red   = red_led->pwm_duty_cycles->duty_pcts9;
+		duty_pcts_green = green_led->pwm_duty_cycles->duty_pcts9;
+		duty_pcts_blue  = blue_led->pwm_duty_cycles->duty_pcts9;
+		break;
+
+	case 10:
+		duty_pcts_red   = red_led->pwm_duty_cycles->duty_pcts10;
+		duty_pcts_green = green_led->pwm_duty_cycles->duty_pcts10;
+		duty_pcts_blue  = blue_led->pwm_duty_cycles->duty_pcts10;
+		break;
+
+	case 11:
+		duty_pcts_red   = red_led->pwm_duty_cycles->duty_pcts11;
+		duty_pcts_green = green_led->pwm_duty_cycles->duty_pcts11;
+		duty_pcts_blue  = blue_led->pwm_duty_cycles->duty_pcts11;
+		break;
+
+	case 12:
+		duty_pcts_red   = red_led->pwm_duty_cycles->duty_pcts12;
+		duty_pcts_green = green_led->pwm_duty_cycles->duty_pcts12;
+		duty_pcts_blue  = blue_led->pwm_duty_cycles->duty_pcts12;
+		break;
+
+	case 13:
+		duty_pcts_red   = red_led->pwm_duty_cycles->duty_pcts13;
+		duty_pcts_green = green_led->pwm_duty_cycles->duty_pcts13;
+		duty_pcts_blue  = blue_led->pwm_duty_cycles->duty_pcts13;
+		break;
+
+	case 14:
+		duty_pcts_red   = red_led->pwm_duty_cycles->duty_pcts14;
+		duty_pcts_green = green_led->pwm_duty_cycles->duty_pcts14;
+		duty_pcts_blue  = blue_led->pwm_duty_cycles->duty_pcts14;
+		break;
+
+	case 15:
+		duty_pcts_red   = red_led->pwm_duty_cycles->duty_pcts15;
+		duty_pcts_green = green_led->pwm_duty_cycles->duty_pcts15;
+		duty_pcts_blue  = blue_led->pwm_duty_cycles->duty_pcts15;
+		break;
+
+	case 16:
+		duty_pcts_red   = red_led->pwm_duty_cycles->duty_pcts16;
+		duty_pcts_green = green_led->pwm_duty_cycles->duty_pcts16;
+		duty_pcts_blue  = blue_led->pwm_duty_cycles->duty_pcts16;
+		break;
+
+	default:
+		return;
+	}
+
+
+	printk("[PMIC K-PJT] LUT is \n");
+	for(i=0;i<79;i++){
+		printk("%d ",duty_pcts_red[i]);
+	}
+	printk("\n");
+
+
+	// 4. lut disable, so we can edit LUT table after done this.
+	pm8xxx_pwm_lut_enable( red_led->pwm_dev, 0 );
+	pm8xxx_pwm_lut_enable( green_led->pwm_dev, 0 );
+	pm8xxx_pwm_lut_enable( blue_led->pwm_dev, 0 );
+
+	// 5. lut config(red led).
+	pm8xxx_pwm_lut_config(
+	red_led->pwm_dev,
+	duty_pcts_red[78],
+	&duty_pcts_red[duty_pcts_red[63]],
+	duty_pcts_red[65],
+	duty_pcts_red[63]+1,
+	duty_pcts_red[64],
+	0,
+	duty_pcts_red[66],
+	duty_pcts_red[75]
+	);
+	// 6. lut config(green led).
+	pm8xxx_pwm_lut_config(
+	green_led->pwm_dev,
+	duty_pcts_green[78],
+	&duty_pcts_green[duty_pcts_green[67]],
+	duty_pcts_green[69],
+	duty_pcts_green[67]+1,
+	duty_pcts_green[68],
+	0,
+	duty_pcts_green[70],
+	duty_pcts_green[76]
+	);
+	// 7. lut config(blue led).
+	pm8xxx_pwm_lut_config(
+	blue_led->pwm_dev,
+	duty_pcts_blue[78],
+	&duty_pcts_blue[duty_pcts_blue[71]],
+	duty_pcts_blue[73],
+	duty_pcts_blue[71]+1,
+	duty_pcts_blue[72],
+	0,
+	duty_pcts_blue[74],
+	duty_pcts_blue[77]
+	);
+
+	// 8. lut enable, so we can run led after done this.
+	pm8xxx_pwm_lut_enable( red_led->pwm_dev, 1 );
+	pm8xxx_pwm_lut_enable( green_led->pwm_dev, 1 );
+	pm8xxx_pwm_lut_enable( blue_led->pwm_dev, 1 );
+
+
+	// 9. set leds brightness to 255
+	if(pattern_r_on)
+	{
+	red_led->cdev.brightness = 255;
+	}
+	if(pattern_g_on)
+	{
+	green_led->cdev.brightness = 255;
+	}
+	if(pattern_b_on)
+	{
+	blue_led->cdev.brightness = 255;
+	}
+
+
+	// 10. run work-function, as brightness 255, all led turn on
+	pm8xxx_led_pwm_work(red_led);
+	pm8xxx_led_pwm_work(green_led);
+	pm8xxx_led_pwm_work(blue_led);
+	}else{
+	//led already turned off.
+	//So what to do? kk.
+	}
+
+
+
+}
+
+#else
+#endif
+/*                                                         */
 
 static int pm8xxx_led_pwm_configure(struct pm8xxx_led_data *led)
 {
+/*                                                         */
+#ifdef CONFIG_LGE_PM8038_KPJT
+	int start_idx, idx_len, duty_us, pause_lo, rc;
+#else
 	int start_idx, idx_len, duty_us, rc;
-
+#endif
+/*                                                         */
 	led->pwm_dev = pwm_request(led->pwm_channel,
 					led->cdev.name);
+
+/*                                                         */ 
+#ifdef CONFIG_LGE_PM8038_KPJT
+	if ( led->pwm_channel ==  RED_CHANNEL ){
+		red_led = led ;
+	}else if(led->pwm_channel ==  GREEN_CHANNEL) {
+		green_led = led ;
+	}else if(led->pwm_channel ==  BLUE_CHANNEL){
+		blue_led = led ;
+	}
+#else
+#endif
+/*                                                         */ 
+
+
 
 	if (IS_ERR_OR_NULL(led->pwm_dev)) {
 		pr_err("could not acquire PWM Channel %d, "
@@ -805,12 +1637,31 @@ static int pm8xxx_led_pwm_configure(struct pm8xxx_led_data *led)
 			pr_err("Exceed LUT limit\n");
 			return -EINVAL;
 		}
-
+/*                                                         */ 
+#ifdef CONFIG_LGE_PM8038_KPJT
+#if defined(CONFIG_MACH_LGE_FX3_VZW) || defined(CONFIG_MACH_LGE_FX3Q_TMUS) 
+		pause_lo = led->pwm_duty_cycles->pause_lo;
+		rc = pm8xxx_pwm_lut_config(led->pwm_dev, led->pwm_period_us,
+				led->pwm_duty_cycles->duty_pcts0,
+				led->pwm_duty_cycles->duty_ms,
+				start_idx, idx_len, pause_lo, 0,
+				PM8XXX_LED_PWM_FLAGS);
+#else
+		pause_lo = led->pwm_duty_cycles->pause_lo;
+		rc = pm8xxx_pwm_lut_config(led->pwm_dev, led->pwm_period_us,
+				led->pwm_duty_cycles->duty_pcts1,
+				led->pwm_duty_cycles->duty_ms,
+				start_idx, idx_len, pause_lo, 0,
+				PM8XXX_LED_PWM_FLAGS);
+#endif
+#else
 		rc = pm8xxx_pwm_lut_config(led->pwm_dev, led->pwm_period_us,
 				led->pwm_duty_cycles->duty_pcts,
 				led->pwm_duty_cycles->duty_ms,
 				start_idx, idx_len, 0, 0,
 				PM8XXX_LED_PWM_FLAGS);
+#endif
+/*                                                         */ 
 	} else {
 		duty_us = led->pwm_period_us;
 		rc = pwm_config(led->pwm_dev, duty_us, led->pwm_period_us);
@@ -944,8 +1795,26 @@ static int __devinit pm8xxx_led_probe(struct platform_device *pdev)
 			__pm8xxx_led_work(led_dat, led->cdev.brightness);
 		}
 	}
-
+/*                                                         */ 
+#ifdef CONFIG_LGE_PM8038_KPJT
+	rc = led_pattern_sysfs_register();
+	if (rc) {
+		dev_err(&pdev->dev, "unable to register pattern_sysfs_register\n");
+		goto fail_id_check;
+	}
+#else
+#endif
+/*                                                         */ 
 	platform_set_drvdata(pdev, led);
+
+#ifdef CONFIG_LGE_PM8038_KPJT
+#if defined(CONFIG_MACH_LGE_FX3_VZW) || defined(CONFIG_MACH_LGE_FX3Q_TMUS) 
+	/* skip booting led*/
+#else
+    if(lge_get_boot_mode() != LGE_BOOT_MODE_MINIOS)
+        change_led_pattern(1,1,1,0);
+#endif
+#endif
 
 	return 0;
 

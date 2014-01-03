@@ -1,0 +1,8 @@
+EXTRA_CFLAGS += -DBMM_USE_BASIC_I2C_FUNC
+
+obj-$(CONFIG_SENSORS_BMA2X2)	+= bma2x2_driver.o
+obj-$(CONFIG_SENSORS_BMA250)    += bma250_driver.o
+obj-$(CONFIG_SENSORS_BMM050)   += bmm050_driver.o bmm050.o
+obj-$(CONFIG_SENSORS_APDS9130)	+= apds9130.o
+obj-$(CONFIG_SENSORS_APDS9190)	+= apds9190.o
+obj-$(CONFIG_SENSORS_AK8963)	+= akm8963.o

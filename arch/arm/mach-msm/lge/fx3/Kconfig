@@ -1,0 +1,96 @@
+config BOARD_HEADER_FILE
+	string "LGE board specific header file name"
+	default ""
+
+config MACH_MSM8930_FX3
+	depends on ARCH_MSM8930
+	select MACH_LGE
+	bool "MSM8930 FX3"
+	help
+	  Support for the LGE MSM8930 FX3 device.
+
+config MACH_LGE_FX3_SPCS
+	bool "LGE FX3 SPCS board"
+	depends on MACH_MSM8930_FX3
+
+config MACH_LGE_FX3_MPCS
+	bool "LGE FX3 MPCS board"
+	depends on MACH_MSM8930_FX3
+
+config MACH_LGE_FX3_VZW
+	bool "LGE FX3 VZW board"
+	depends on MACH_MSM8930_FX3
+
+config MACH_LGE_FX3_TMUS
+	bool "LGE FX3 TMUS board"
+	depends on MACH_MSM8930_FX3
+
+config MACH_LGE_FX3_GLOBAL
+	bool "LGE FX3 GLOBAL board"
+	depends on MACH_MSM8930_FX3
+
+config MACH_LGE_FX3_ATT
+	bool "LGE FX3 AT&T board"
+	depends on MACH_MSM8930_FX3
+
+config MACH_LGE_FX3_EUR
+	bool "LGE FX3 EUR board"
+	depends on MACH_MSM8930_FX3
+	
+config MACH_LGE_F6_TMUS
+	bool "LGE F6 TMUS board"
+	depends on MACH_MSM8930_FX3	
+
+config MACH_LGE_F6_VDF
+	bool "LGE F6 VDF board"
+	depends on MACH_MSM8930_FX3	
+
+config MACH_LGE_F6_ORG
+	bool "LGE F6 ORG board"
+	depends on MACH_MSM8930_FX3	
+
+config MACH_LGE_F6_OPEN
+	bool "LGE F6 OPEN board"
+	depends on MACH_MSM8930_FX3	
+
+config MACH_LGE_F6_TMO
+        bool "LGE F6 TMO board"
+        depends on MACH_MSM8930_FX3
+
+config MACH_LGE_FX3_SPCSTRF
+    bool "LGE FX3 TRF board"
+    depends on MACH_MSM8930_FX3
+
+
+config MACH_LGE_FX3_WCDMA_TRF_US
+	bool "LGE FX3 WCDMA TRF US board"
+	depends on MACH_MSM8930_FX3
+
+config LGE_PM8038_KPJT
+	bool "LGE FX3 SPCS board"
+	depends on MACH_MSM8930_FX3
+
+config MACH_LGE_FX3_CRK
+	bool "LGE FX3 CRK board"
+	depends on MACH_MSM8930_FX3
+
+config MACH_LGE_L9II_COMMON
+	bool "LGE L9II board"
+	depends on MACH_MSM8930_FX3
+
+config MACH_LGE_L9II_OPEN_EU
+	bool "LGE L9II OPEN EU board"
+	depends on MACH_MSM8930_FX3
+
+config MACH_LGE_L9II_ORG
+	bool "LGE L9II ORG board"
+	depends on MACH_MSM8930_FX3
+	
+config MACH_LGE_L9II_VDF
+	bool "LGE L9II VDF board"
+	depends on MACH_MSM8930_FX3
+
+config MACH_LGE_FX3Q_TMUS
+	bool "LGE FX3Q TMUS board"
+	depends on MACH_MSM8930_FX3
+

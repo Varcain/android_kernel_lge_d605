@@ -56,6 +56,18 @@
 #include <mach/dma.h>
 #include <mach/sdio_al.h>
 #include <mach/mpm.h>
+
+#ifdef CONFIG_MACH_LGE
+	/*           
+                                                             
+                           
+                            
+ */
+	#if defined(CONFIG_MACH_MSM8960_L_DCM)
+	#include <mach/board_lge.h>
+	#endif
+#endif
+
 #include <mach/msm_bus.h>
 
 #include "msm_sdcc.h"
@@ -226,7 +238,17 @@ static inline void msmsdcc_sps_exit(struct msmsdcc_host *host) {}
 static int msmsdcc_bam_dml_reset_and_restore(struct msmsdcc_host *host)
 {
 	int rc;
+#ifdef NON_DMLRESET_PATCH 
 
+/* Fix SDCC-BAM, DML reset sequence */
+ 
+      https://www.codeaurora.org/gitweb/quic/la/?p=kernel/msm.git;a=blobdiff;
+      f=drivers/mmc/host/msm_sdcc.c;h=91720ee4f7cabb6cdab3a29e4f72a0c3789ed1bc;
+      hp=f1ba8ad073dd6ee53929288df0e093da6a5e00f4;hb=f8fef46776dad3e830de1f945d 
+      c8f3df95848193;hpb=b97cd26f42d0f6ede07f2db8bda5477c150ef83c
+*/  
+
+#endif
 	/* Reset all SDCC BAM pipes */
 	rc = msmsdcc_sps_reset_ep(host, &host->sps.prod);
 	if (rc) {
@@ -259,6 +281,8 @@ static int msmsdcc_bam_dml_reset_and_restore(struct msmsdcc_host *host)
 	}
 
 	rc = msmsdcc_sps_restore_ep(host, &host->sps.cons);
+/*            */
+#ifdef NON_DMLRESET_PATCH 
 	if (rc) {
 		pr_err("%s: msmsdcc_sps_restore_ep(cons) error=%d\n",
 				mmc_hostname(host->mmc), rc);
@@ -275,6 +299,25 @@ out:
 	if (!rc)
 		host->sps.reset_bam = false;
 	return rc;
+#else
+    if (rc) {                 
+        pr_err("%s: msmsdcc_sps_restore_ep(cons) error=%d\n",
+            mmc_hostname(host->mmc), rc);
+        goto out;
+        }
+
+    /* Reset and Init DML*/
+    rc = msmsdcc_dml_init(host);
+    if (rc)
+        pr_err("%s: msmsdcc_dml_init error=%d\n",
+            mmc_hostname(host->mmc), rc);
+
+    out:
+        if(!rc)
+            host->sps.reset_bam = false;
+        return rc;
+    
+#endif
 }
 
 /**
@@ -457,9 +500,21 @@ static void msmsdcc_reset_dpsm(struct msmsdcc_host *host)
 					readl_relaxed(host->base + MMCISTATUS)
 					& MCI_TXACTIVE ? "TX" : "RX");
 				msmsdcc_dump_sdcc_state(host);
+/* START 
+ * QCT Code - SR:01041240 
+ Reset SDCC controller if the check for TX/RX ACTIVE bit fails while
+ carrying out DPSM reset after the end of current transaction
+ instead of taking the entire system down by doing BUG().
+*/
+#if 1
 				msmsdcc_reset_and_restore(host);
 				host->pending_dpsm_reset = false;
 				goto out;
+#endif
+/*
+ * END 
+ * QCT Code - SR:01041240 
+ */
 			}
 		}
 	}
@@ -1218,14 +1273,27 @@ msmsdcc_start_command_deferred(struct msmsdcc_host *host,
 		writel_relaxed((readl_relaxed(host->base +
 				MCI_DLL_CONFIG) & ~MCI_CDR_EN),
 				host->base + MCI_DLL_CONFIG);
-
-	if (((cmd->flags & MMC_RSP_R1B) == MMC_RSP_R1B) ||
+/*            */
+#ifndef BKOPS_UPDATE
+/*
+02-14
+sending out the CMD13 to card  even if command flags doesn't indicate
+so. This may cause the issue in when we try to HPI (High Priority
+Interrupt) the ongoing BKOPs (Background Operations). Hence this
+change removes the busy wait (PROG_DONE) for CMD13.
+*/
+	if ((cmd->flags & MMC_RSP_R1B) == MMC_RSP_R1B) {
+		*c |= MCI_CPSM_PROGENA;
+		host->prog_enable = 1;
+	}
+#else
+    	if (((cmd->flags & MMC_RSP_R1B) == MMC_RSP_R1B) ||
 			(cmd->opcode == MMC_SEND_STATUS &&
 			 !(cmd->flags & MMC_CMD_ADTC))) {
 		*c |= MCI_CPSM_PROGENA;
 		host->prog_enable = 1;
 	}
-
+#endif
 	if (cmd == cmd->mrq->stop)
 		*c |= MCI_CSPM_MCIABORT;
 
@@ -1626,6 +1694,19 @@ msmsdcc_pio_irq(int irq, void *dev_id)
 
 		if (!msmsdcc_sg_next(host, &buffer, &remain))
 			break;
+
+#ifdef CONFIG_MACH_LGE
+		/*           
+                                                           
+                                  
+  */
+		if(!host->curr.data)
+		{
+			writel(0, base + MMCIMASK1);
+			spin_unlock(&host->lock);
+			return IRQ_HANDLED;
+		}
+#endif
 
 		len = 0;
 		if (status & MCI_RXACTIVE)
@@ -2429,6 +2510,14 @@ static int msmsdcc_setup_vreg(struct msmsdcc_host *host, bool enable,
 	struct msm_mmc_slot_reg_data *curr_slot;
 	struct msm_mmc_reg_data *vreg_table[2];
 
+#ifdef CONFIG_MACH_MSM8930_FX3
+//garry.shin
+    if( host->mmc->index == 2 ) 
+	{
+		printk("%s:mmc2 return 0\n", __func__ );
+		return 0;
+	}
+#endif
 	curr_slot = host->plat->vreg_data;
 	if (!curr_slot) {
 		rc = -EINVAL;
@@ -4214,6 +4303,14 @@ msmsdcc_check_status(unsigned long data)
 		else
 			status = msmsdcc_slot_status(host);
 
+#ifdef CONFIG_MACH_LGE
+		/*           
+                
+                                  
+  */
+		printk(KERN_INFO "[LGE][MMC][%-18s( )] slot_status:%d, host->oldstat:%d, host->eject:%d\n", __func__, status, host->oldstat, host->eject);
+#endif 
+		
 		host->eject = !status;
 
 		if (status ^ host->oldstat) {
@@ -4246,6 +4343,14 @@ static irqreturn_t
 msmsdcc_platform_status_irq(int irq, void *dev_id)
 {
 	struct msmsdcc_host *host = dev_id;
+
+#ifdef CONFIG_MACH_LGE
+	/*           
+               
+                                 
+ */
+	printk(KERN_INFO "[LGE][MMC][%-18s( )] irq:%d\n", __func__, irq);
+#endif
 
 	pr_debug("%s: %d\n", __func__, irq);
 	msmsdcc_check_status((unsigned long) host);
@@ -5056,10 +5161,19 @@ static void msmsdcc_req_tout_timer_hdlr(unsigned long data)
 	mrq = host->curr.mrq;
 
 	if (mrq && mrq->cmd) {
+/*            */
+#ifndef BKOPS_UPDATE        
+		if (!mrq->cmd->bkops_busy) {
+			pr_info("%s: CMD%d: Request timeout\n",
+				mmc_hostname(host->mmc), mrq->cmd->opcode);
+			msmsdcc_dump_sdcc_state(host);
+		}
+#else
 		pr_info("%s: CMD%d: Request timeout\n", mmc_hostname(host->mmc),
 				mrq->cmd->opcode);
 		msmsdcc_dump_sdcc_state(host);
 
+#endif
 		if (!mrq->cmd->error)
 			mrq->cmd->error = -ETIMEDOUT;
 		host->dummy_52_needed = 0;
@@ -5837,7 +5951,25 @@ msmsdcc_probe(struct platform_device *pdev)
 	mmc->pm_caps |= MMC_PM_KEEP_POWER | MMC_PM_WAKE_SDIO_IRQ;
 	mmc->caps |= plat->mmc_bus_width;
 	mmc->caps |= MMC_CAP_MMC_HIGHSPEED | MMC_CAP_SD_HIGHSPEED;
+#ifdef CONFIG_MACH_LGE
+	/*           
+                                                             
+                           
+                            
+ */
+	#if defined(CONFIG_MACH_MSM8960_L_DCM)
+		if (lge_get_board_revno() >= HW_REV_D) {
+			mmc->caps |= MMC_CAP_WAIT_WHILE_BUSY | MMC_CAP_ERASE;
+		} else {
+			mmc->caps |= MMC_CAP_WAIT_WHILE_BUSY;
+		}
+	#else
+		mmc->caps |= MMC_CAP_WAIT_WHILE_BUSY | MMC_CAP_ERASE;
+	#endif
+#else
 	mmc->caps |= MMC_CAP_WAIT_WHILE_BUSY | MMC_CAP_ERASE;
+#endif
+
 	mmc->caps |= MMC_CAP_HW_RESET;
 	/*
 	 * If we send the CMD23 before multi block write/read command
@@ -6611,6 +6743,60 @@ static int msmsdcc_runtime_resume(struct device *dev)
 	return 0;
 }
 #endif
+
+/*            */
+int sdc_clock_enable(struct mmc_host *mmc)
+{
+	struct msmsdcc_host *host = mmc_priv(mmc);
+	
+	int rc = 0;
+	
+	mutex_lock(&host->clk_mutex);
+
+	rc = msmsdcc_setup_clocks(host, true);
+	mutex_unlock(&host->clk_mutex);
+	return rc;
+}
+int sdc_clock_disable(struct mmc_host *mmc)
+{
+	struct msmsdcc_host *host = mmc_priv(mmc);
+	
+	int rc = 0;
+	mutex_lock(&host->clk_mutex);
+	rc = msmsdcc_setup_clocks(host, false);
+
+	mutex_unlock(&host->clk_mutex);
+	return rc;
+}
+
+void
+msmsdcc_set_mmc_enable(int card_present, void *dev_id)
+{
+	struct msmsdcc_host *host = dev_id;
+//	struct device *dev = host->mmc->parent;
+	//wifi_enable=1;
+
+	if(card_present)
+	{
+//		msmsdcc_runtime_resume(dev);
+//		if (msmsdcc_enable(host->mmc))
+//			printk("[BIGLAKE] msmsdcc_enable fail!!!\n");;
+		if(sdc_clock_enable(host->mmc))
+			printk("[BIGLAKE] clk enable fail!!!\n");
+		
+	}
+	else
+	{
+//		msmsdcc_runtime_suspend(dev);
+//		if (msmsdcc_disable(host->mmc))
+//			printk("[BIGLAKE] msmsdcc_disable fail!!!\n");;
+		if(sdc_clock_disable(host->mmc))
+			printk("[BIGLAKE] clk disable fail!!!\n");
+
+		
+	}	
+	//wifi_enable=0;
+}
 
 static const struct dev_pm_ops msmsdcc_dev_pm_ops = {
 	.runtime_suspend = msmsdcc_runtime_suspend,

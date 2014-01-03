@@ -150,6 +150,12 @@ struct audio_client {
 	struct mutex	       cmd_lock;
 
 	atomic_t		cmd_state;
+/*                                      
+                                                             
+                                 
+*/	
+	atomic_t		cmd_close_state;
+/*              */
 	atomic_t		time_flag;
 	atomic_t		nowait_cmd_cnt;
 	wait_queue_head_t	cmd_wait;
@@ -304,6 +310,9 @@ int q6asm_media_format_block_wmapro(struct audio_client *ac,
 int q6asm_equalizer(struct audio_client *ac, void *eq);
 
 /* Send Volume Command */
+//                                                 
+int q6asm_set_volume_nosync(struct audio_client *ac, int volume);
+//                                                 
 int q6asm_set_volume(struct audio_client *ac, int volume);
 
 /* Set SoftPause Params */

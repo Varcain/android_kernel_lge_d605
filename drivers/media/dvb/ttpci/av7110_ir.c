@@ -411,5 +411,5 @@ void __devexit av7110_ir_exit(struct av7110 *av7110)
 	av_cnt--;
 }
 
-//MODULE_AUTHOR("Holger Waechtler <holger@convergence.de>, Oliver Endriss <o.endriss@gmx.de>");
+//                                                                                             
 //MODULE_LICENSE("GPL");

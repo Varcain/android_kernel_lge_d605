@@ -256,6 +256,8 @@ static int rmnet_gport_setup(void)
 			return ret;
 	}
 
+/*            */
+#if defined(CONFIG_USB_CI13XXX_MSM_HSIC)
 	if (no_data_hsic_ports) {
 		port_idx = ghsic_data_setup(no_data_hsic_ports,
 				USB_GADGET_RMNET);
@@ -283,6 +285,7 @@ static int rmnet_gport_setup(void)
 			}
 		}
 	}
+#endif
 
 	if (no_data_hsuart_ports) {
 		port_idx = ghsuart_data_setup(no_data_hsuart_ports,
@@ -336,6 +339,8 @@ static int gport_rmnet_connect(struct f_rmnet *dev)
 			return ret;
 		}
 		break;
+/*            */
+#if defined(CONFIG_USB_CI13XXX_MSM_HSIC)
 	case USB_GADGET_XPORT_HSIC:
 		ret = ghsic_ctrl_connect(&dev->port, port_num);
 		if (ret) {
@@ -344,6 +349,7 @@ static int gport_rmnet_connect(struct f_rmnet *dev)
 			return ret;
 		}
 		break;
+#endif
 	case USB_GADGET_XPORT_HSUART:
 		ret = ghsuart_ctrl_connect(&dev->port, port_num);
 		if (ret) {
@@ -373,6 +379,8 @@ static int gport_rmnet_connect(struct f_rmnet *dev)
 			return ret;
 		}
 		break;
+/*            */
+#if defined(CONFIG_USB_CI13XXX_MSM_HSIC)
 	case USB_GADGET_XPORT_HSIC:
 		ret = ghsic_data_connect(&dev->port, port_num);
 		if (ret) {
@@ -382,6 +390,7 @@ static int gport_rmnet_connect(struct f_rmnet *dev)
 			return ret;
 		}
 		break;
+#endif
 	case USB_GADGET_XPORT_HSUART:
 		ret = ghsuart_data_connect(&dev->port, port_num);
 		if (ret) {
@@ -417,9 +426,12 @@ static int gport_rmnet_disconnect(struct f_rmnet *dev)
 	case USB_GADGET_XPORT_SMD:
 		gsmd_ctrl_disconnect(&dev->port, port_num);
 		break;
+/*            */
+#if defined(CONFIG_USB_CI13XXX_MSM_HSIC)
 	case USB_GADGET_XPORT_HSIC:
 		ghsic_ctrl_disconnect(&dev->port, port_num);
 		break;
+#endif
 	case USB_GADGET_XPORT_HSUART:
 		ghsuart_ctrl_disconnect(&dev->port, port_num);
 		break;
@@ -437,9 +449,12 @@ static int gport_rmnet_disconnect(struct f_rmnet *dev)
 	case USB_GADGET_XPORT_BAM2BAM:
 		gbam_disconnect(&dev->port, port_num, dxport);
 		break;
+/*            */
+#if defined(CONFIG_USB_CI13XXX_MSM_HSIC)
 	case USB_GADGET_XPORT_HSIC:
 		ghsic_data_disconnect(&dev->port, port_num);
 		break;
+#endif
 	case USB_GADGET_XPORT_HSUART:
 		ghsuart_data_disconnect(&dev->port, port_num);
 		break;
@@ -1123,10 +1138,13 @@ static int frmnet_init_port(const char *ctrl_name, const char *data_name)
 		rmnet_port->ctrl_xport_num = no_ctrl_smd_ports;
 		no_ctrl_smd_ports++;
 		break;
+/*            */
+#if defined(CONFIG_USB_CI13XXX_MSM_HSIC)
 	case USB_GADGET_XPORT_HSIC:
 		rmnet_port->ctrl_xport_num = no_ctrl_hsic_ports;
 		no_ctrl_hsic_ports++;
 		break;
+#endif
 	case USB_GADGET_XPORT_HSUART:
 		rmnet_port->ctrl_xport_num = no_ctrl_hsuart_ports;
 		no_ctrl_hsuart_ports++;
@@ -1149,10 +1167,13 @@ static int frmnet_init_port(const char *ctrl_name, const char *data_name)
 		rmnet_port->data_xport_num = no_data_bam2bam_ports;
 		no_data_bam2bam_ports++;
 		break;
+/*            */
+#if defined(CONFIG_USB_CI13XXX_MSM_HSIC)
 	case USB_GADGET_XPORT_HSIC:
 		rmnet_port->data_xport_num = no_data_hsic_ports;
 		no_data_hsic_ports++;
 		break;
+#endif
 	case USB_GADGET_XPORT_HSUART:
 		rmnet_port->data_xport_num = no_data_hsuart_ports;
 		no_data_hsuart_ports++;

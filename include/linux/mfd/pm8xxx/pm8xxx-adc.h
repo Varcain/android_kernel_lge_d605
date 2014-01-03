@@ -110,7 +110,11 @@ enum pm8xxx_adc_channels {
 #define PM8XXX_AMUX_MPP_6	0x6
 #define PM8XXX_AMUX_MPP_7	0x7
 #define PM8XXX_AMUX_MPP_8	0x8
-
+#ifdef CONFIG_LGE_PM
+/*                                                                    */
+#define PM8XXX_AMUX_MPP_12	0xC
+/*                                        */
+#endif
 #define PM8XXX_ADC_DEV_NAME	"pm8xxx-adc"
 
 /**

@@ -56,6 +56,13 @@
 
 static unsigned int min_sampling_rate;
 
+/*
+                            
+*/
+#ifdef CONFIG_MACH_LGE
+static unsigned long dbs_annoying_timeout = 0;
+#endif
+
 #define LATENCY_MULTIPLIER			(1000)
 #define MIN_LATENCY_MULTIPLIER			(100)
 #define TRANSITION_LATENCY_LIMIT		(10 * 1000 * 1000)
@@ -867,6 +874,19 @@ bail_incorrect_governor:
 
 bail_acq_sema_failed:
 	put_online_cpus();
+
+/*
+                            
+                                             
+*/
+#ifdef CONFIG_MACH_LGE
+	{
+		int i;
+		for_each_online_cpu(i)
+			cpufreq_update_policy(i);
+	}
+#endif
+
 	return;
 }
 
@@ -874,6 +894,20 @@ static void dbs_input_event(struct input_handle *handle, unsigned int type,
 		unsigned int code, int value)
 {
 	int i;
+
+/*
+                            
+                                      
+                                                     
+*/
+#ifdef CONFIG_MACH_LGE
+	if (code != KEY_POWER && jiffies <= dbs_annoying_timeout && \
+		                      (jiffies + HZ) > dbs_annoying_timeout) {
+		return;
+	}
+	dbs_annoying_timeout = jiffies + 1;
+#endif
+
 
 	if ((dbs_tuners_ins.powersave_bias == POWERSAVE_BIAS_MAXLEVEL) ||
 		(dbs_tuners_ins.powersave_bias == POWERSAVE_BIAS_MINLEVEL)) {
@@ -946,6 +980,7 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 
 	this_dbs_info = &per_cpu(od_cpu_dbs_info, cpu);
 
+
 	switch (event) {
 	case CPUFREQ_GOV_START:
 		if ((!cpu_online(cpu)) || (!policy->cur))
@@ -1010,7 +1045,13 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		dbs_timer_exit(this_dbs_info);
 
 		mutex_lock(&dbs_mutex);
+
+		#ifdef CONFIG_MACH_LGE
+		/* nothing */
+		#else
 		mutex_destroy(&this_dbs_info->timer_mutex);
+		#endif
+
 		dbs_enable--;
 		/* If device is being removed, policy is no longer
 		 * valid. */
@@ -1025,7 +1066,13 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		break;
 
 	case CPUFREQ_GOV_LIMITS:
-		mutex_lock(&this_dbs_info->timer_mutex);
+
+#ifdef CONFIG_MACH_LGE
+	if(!this_dbs_info->cur_policy)
+		return -EINVAL;
+#endif
+
+	mutex_lock(&this_dbs_info->timer_mutex);
 		if (policy->max < this_dbs_info->cur_policy->cur)
 			__cpufreq_driver_target(this_dbs_info->cur_policy,
 				policy->max, CPUFREQ_RELATION_H);
@@ -1048,6 +1095,12 @@ static int __init cpufreq_gov_dbs_init(void)
 	u64 idle_time;
 	unsigned int i;
 	int cpu = get_cpu();
+
+	/*                              */
+	#ifdef CONFIG_MACH_LGE
+	mutex_init(&dbs_mutex);
+	#endif
+	/*              */
 
 	idle_time = get_cpu_idle_time_us(cpu, NULL);
 	put_cpu();

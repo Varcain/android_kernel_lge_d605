@@ -673,9 +673,9 @@ struct drbd_thread {
 
 static inline enum drbd_thread_state get_t_state(struct drbd_thread *thi)
 {
-	/* THINK testing the t_state seems to be uncritical in all cases
-	 * (but thread_{start,stop}), so we can read it *without* the lock.
-	 *	--lge */
+	/*                                                              
+                                                                    
+          */
 
 	smp_rmb();
 	return thi->t_state;

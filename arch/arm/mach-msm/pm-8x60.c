@@ -51,6 +51,18 @@
 #include "pm-boot.h"
 #include <mach/event_timer.h>
 
+#ifdef CONFIG_LGE_PM
+#include <mach/board_lge.h>
+#endif
+
+#if defined(CONFIG_MACH_LGE_FX3_VZW) || defined(CONFIG_MACH_LGE_F6_TMUS) || defined(CONFIG_MACH_LGE_L9II_COMMON) || defined (CONFIG_MACH_LGE_FX3Q_TMUS)
+#include <linux/gpio.h>
+#include <linux/mfd/pm8xxx/gpio.h>
+
+#define PM8038_GPIO_BASE                NR_GPIO_IRQS
+#define PM8038_GPIO_PM_TO_SYS(pm_gpio)  (pm_gpio - 1 + PM8038_GPIO_BASE)
+#endif
+
 /******************************************************************************
  * Debug Definitions
  *****************************************************************************/
@@ -991,6 +1003,37 @@ static int msm_pm_enter(suspend_state_t state)
 			pr_info("%s: power collapse\n", __func__);
 
 		clock_debug_print_enabled();
+
+/*                                                  
+                                   
+  */
+#ifdef CONFIG_MACH_LGE_FX3_VZW
+	gpio_tlmm_config(GPIO_CFG(112, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+	gpio_tlmm_config(GPIO_CFG(117, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+	gpio_tlmm_config(GPIO_CFG(118, 0, GPIO_CFG_INPUT, GPIO_CFG_NO_PULL, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+#endif
+
+#ifdef CONFIG_MACH_LGE_F6_TMUS
+	/*                                               
+                                                                          
+                                             
+                                                
+  */
+	gpio_tlmm_config(GPIO_CFG(140, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+	gpio_tlmm_config(GPIO_CFG(141, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+	/*             */
+#endif /*                         */
+
+#ifdef CONFIG_MACH_LGE_L9II_COMMON
+	gpio_tlmm_config(GPIO_CFG(140, 0, GPIO_CFG_INPUT, GPIO_CFG_PULL_DOWN, GPIO_CFG_2MA), GPIO_CFG_ENABLE);
+#endif
+
+#ifdef CONFIG_LGE_PM
+		/*                                               
+                                             */
+		gpio_debug_print();
+		/*              */
+#endif /*               */
 
 #ifdef CONFIG_MSM_SLEEP_TIME_OVERRIDE
 		if (msm_pm_sleep_time_override > 0) {

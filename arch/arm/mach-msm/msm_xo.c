@@ -161,6 +161,32 @@ static int msm_xo_show_voters(struct seq_file *m, void *v)
 	return 0;
 }
 
+/*            */
+#ifdef CONFIG_LGE_PM
+static struct  delayed_work     xo_print_work;
+static void msm_xo_show_voters_worker(struct work_struct *work)
+{
+	int i;
+	struct msm_xo *xo = &msm_xo_sources[0];
+	struct msm_xo_voter *voter;
+
+	mutex_lock(&msm_xo_lock);
+	for (i = 0; i < ARRAY_SIZE(msm_xo_sources); i++)
+	{
+		pr_info("CXO %-16s%s\n", msm_xo_to_str[i], msm_xo_mode_to_str[xo->mode]);
+		xo = &msm_xo_sources[i];
+		list_for_each_entry(voter, &xo->voters, list)
+			pr_info(" %s %-16s %s\n",
+				xo->mode == voter->mode ? "*" : " ",
+				voter->name,
+				msm_xo_mode_to_str[voter->mode]);
+	}
+
+	mutex_unlock(&msm_xo_lock);
+	schedule_delayed_work(&xo_print_work, round_jiffies_relative(msecs_to_jiffies(60000)));
+}
+#endif
+
 static int msm_xo_voters_open(struct inode *inode, struct file *file)
 {
 	return single_open(file, msm_xo_show_voters, inode->i_private);
@@ -384,5 +410,10 @@ int __init msm_xo_init(void)
 	if (ret)
 		return ret;
 	msm_xo_debugfs_init();
+/*            */
+#ifdef CONFIG_LGE_PM
+	INIT_DELAYED_WORK(&xo_print_work, msm_xo_show_voters_worker); 
+	schedule_delayed_work(&xo_print_work, round_jiffies_relative(msecs_to_jiffies(30000)));
+#endif
 	return 0;
 }

@@ -19,6 +19,15 @@ config MMC_DEBUG
 	  This is an option for use by developers; most people should
 	  say N here.  This enables MMC core and driver debugging.
 
+#LGE_UPDATE_START
+#Disable BKOPS config
+config LGE_MMC_BKOPS_DISABLE
+	bool "Disable eMMC's BKOPS"
+	depends on MMC != n
+	help
+	  If you say Y here, eMMC will not use BKOPS.
+#LGE_UPDATE_END
+
 config MMC_PERF_PROFILING
 	bool "MMC performance profiling"
 	depends on MMC != n

@@ -39,12 +39,15 @@ u32 dsi_irq;
 u32 esc_byte_ratio;
 
 static boolean tlmm_settings = FALSE;
-
+/*            */
+static bool bmipi_off = 0;
 static int mipi_dsi_probe(struct platform_device *pdev);
 static int mipi_dsi_remove(struct platform_device *pdev);
 
 static int mipi_dsi_off(struct platform_device *pdev);
 static int mipi_dsi_on(struct platform_device *pdev);
+/*            */
+static void mipi_dsi_shutdown(struct platform_device *pdev);
 
 static struct platform_device *pdev_list[MSM_FB_MAX_DEV_LIST];
 static int pdev_list_cnt;
@@ -55,7 +58,8 @@ static int vsync_gpio = -1;
 static struct platform_driver mipi_dsi_driver = {
 	.probe = mipi_dsi_probe,
 	.remove = mipi_dsi_remove,
-	.shutdown = NULL,
+  /*            */
+	.shutdown = mipi_dsi_shutdown,
 	.driver = {
 		   .name = "mipi_dsi",
 		   },
@@ -63,9 +67,90 @@ static struct platform_driver mipi_dsi_driver = {
 
 struct device dsi_dev;
 
+/*            */
+static void mipi_dsi_shutdown(struct platform_device *pdev)
+{
+
+	if(bmipi_off == 0)
+	{
+	int ret = 0;
+	struct msm_fb_data_type *mfd;
+	struct msm_panel_info *pinfo;
+
+	pr_debug("Start of %s....:\n", __func__);
+
+	mfd = platform_get_drvdata(pdev);
+	pinfo = &mfd->panel_info;
+
+	if (mdp_rev >= MDP_REV_41)
+		mutex_lock(&mfd->dma->ov_mutex);
+	else
+		down(&mfd->dma->mutex);
+
+	if (mfd->panel_info.type == MIPI_CMD_PANEL) {
+		mipi_dsi_prepare_clocks();
+		mipi_dsi_ahb_ctrl(1);
+		mipi_dsi_clk_enable();
+
+		/* make sure dsi_cmd_mdp is idle */
+		mipi_dsi_cmd_mdp_busy();
+	}
+	/*
+	 * Desctiption: change to DSI_CMD_MODE since it needed to
+	 * tx DCS dsiplay off comamnd to panel
+	 */
+	mipi_dsi_op_mode_config(DSI_CMD_MODE);
+
+	if (mfd->panel_info.type == MIPI_CMD_PANEL) {
+		if (pinfo->lcd.vsync_enable) {
+			if (pinfo->lcd.hw_vsync_mode && vsync_gpio >= 0) {
+				if (MDP_REV_303 != mdp_rev)
+					gpio_free(vsync_gpio);
+			}
+			mipi_dsi_set_tear_off(mfd);
+		}
+	}
+
+	ret = panel_next_off(pdev);
+
+#if defined(CONFIG_MDP_RUNTIME_BANDWIDTH)
+#else
+#ifdef CONFIG_MSM_BUS_SCALING
+	mdp_bus_scale_update_request(0);
+#endif
+#endif
+
+	mipi_dsi_clk_disable();
+
+	/* disbale dsi engine */
+	MIPI_OUTP(MIPI_DSI_BASE + 0x0000, 0);
+
+	mipi_dsi_phy_ctrl(0);
+
+	mipi_dsi_ahb_ctrl(0);
+
+	mipi_dsi_unprepare_clocks();
+	if (mipi_dsi_pdata && mipi_dsi_pdata->dsi_power_save)
+		mipi_dsi_pdata->dsi_power_save(0);
+
+	if (mdp_rev >= MDP_REV_41)
+		mutex_unlock(&mfd->dma->ov_mutex);
+	else
+		up(&mfd->dma->mutex);
+
+	pr_debug("End of %s ....:\n", __func__);
+	bmipi_off = 1;
+	}
+}
+
+
 static int mipi_dsi_off(struct platform_device *pdev)
 {
 	int ret = 0;
+
+/*            */
+	if(bmipi_off == 0)
+	{
 	struct msm_fb_data_type *mfd;
 	struct msm_panel_info *pinfo;
 
@@ -106,8 +191,11 @@ static int mipi_dsi_off(struct platform_device *pdev)
 
 	ret = panel_next_off(pdev);
 
+#if defined(CONFIG_MDP_RUNTIME_BANDWIDTH)
+#else
 #ifdef CONFIG_MSM_BUS_SCALING
 	mdp_bus_scale_update_request(0);
+#endif
 #endif
 
 	mipi_dsi_clk_disable();
@@ -130,6 +218,9 @@ static int mipi_dsi_off(struct platform_device *pdev)
 
 	pr_debug("End of %s ....:\n", __func__);
 
+/*            */
+	bmipi_off = 1;
+	}
 	return ret;
 }
 
@@ -313,8 +404,11 @@ static int mipi_dsi_on(struct platform_device *pdev)
 		mipi_dsi_unprepare_clocks();
 	}
 
+#if defined(CONFIG_MDP_RUNTIME_BANDWIDTH)
+#else
 #ifdef CONFIG_MSM_BUS_SCALING
 	mdp_bus_scale_update_request(2);
+#endif
 #endif
 
 	if (mdp_rev >= MDP_REV_41)
@@ -323,6 +417,8 @@ static int mipi_dsi_on(struct platform_device *pdev)
 		up(&mfd->dma->mutex);
 
 	pr_debug("End of %s....:\n", __func__);
+  /*            */
+	bmipi_off = 0;
 
 	return ret;
 }
@@ -419,6 +515,7 @@ static int mipi_dsi_probe(struct platform_device *pdev)
 		if (mipi_dsi_clk_init(pdev))
 			return -EPERM;
 
+#if !defined(CONFIG_FB_MSM_MIPI_DSI_HIMAX) || defined(CONFIG_MACH_LGE_FX3_VZW) || defined(CONFIG_MACH_LGE_FX3Q_TMUS)
 		if (mipi_dsi_pdata->splash_is_enabled &&
 			!mipi_dsi_pdata->splash_is_enabled()) {
 			mipi_dsi_ahb_ctrl(1);
@@ -427,6 +524,7 @@ static int mipi_dsi_probe(struct platform_device *pdev)
 			MIPI_OUTP(MIPI_DSI_BASE + 0x200, 0);
 			mipi_dsi_ahb_ctrl(0);
 		}
+#endif
 		mipi_dsi_resource_initialized = 1;
 
 		return 0;
@@ -580,7 +678,6 @@ static int mipi_dsi_probe(struct platform_device *pdev)
 		goto mipi_dsi_probe_err;
 
 	pdev_list[pdev_list_cnt++] = pdev;
-
 	if (!mfd->cont_splash_done)
 		cont_splash_clk_ctrl(1);
 

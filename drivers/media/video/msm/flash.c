@@ -32,6 +32,21 @@ enum msm_cam_flash_stat{
 	MSM_CAM_FLASH_ON,
 };
 
+/*           
+                                 
+ */
+#ifdef CONFIG_LEDS_AS364X
+extern int as3647_flash_set_led_state(int state);
+#endif
+/*                                                                 */
+#ifdef CONFIG_MSM_CAMERA_FLASH_LM3559
+extern int lm3559_flash_set_led_state(int state);
+#endif
+#if defined (CONFIG_MSM_CAMERA_FLASH_LM3639)
+extern int lm3639_flash_set_led_state(int led_state);
+#endif
+/*                                                                 */
+
 static struct i2c_client *sc628a_client;
 
 static const struct i2c_device_id sc628a_i2c_id[] = {
@@ -215,6 +230,12 @@ int msm_camera_flash_current_driver(
 	}
 	CDBG("msm_camera_flash_led_pmic8058: return %d\n", rc);
 #endif /* CONFIG_LEDS_PMIC8058 */
+
+  /*            */
+	pr_err("[%s]::%d\n", __func__, led_state);
+#ifdef CONFIG_LEDS_AS364X
+	rc = as3647_flash_set_led_state(led_state);
+#endif
 	return rc;
 }
 
@@ -756,8 +777,18 @@ int msm_flash_ctrl(struct msm_camera_sensor_info *sdata,
 	sensor_data = sdata;
 	switch (flash_info->flashtype) {
 	case LED_FLASH:
+/*                                                                 */
+#if defined (CONFIG_MSM_CAMERA_FLASH_LM3559)
+		rc = lm3559_flash_set_led_state(flash_info->ctrl_data.led_state);
+		CDBG("%s: lm3559_flash_set_led_state rc = %d\n", __func__, rc);
+#elif defined (CONFIG_MSM_CAMERA_FLASH_LM3639)
+		rc = lm3639_flash_set_led_state(flash_info->ctrl_data.led_state);
+		CDBG("%s: lm3639_flash_set_led_state rc = %d\n", __func__, rc);
+#else
 		rc = msm_camera_flash_set_led_state(sdata->flash_data,
 			flash_info->ctrl_data.led_state);
+#endif
+/*                                                                 */
 			break;
 	case STROBE_FLASH:
 		rc = msm_strobe_flash_ctrl(sdata->strobe_flash_data,

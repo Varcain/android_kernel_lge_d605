@@ -1,0 +1,77 @@
+config MACH_LGE
+	bool
+
+menu "LGE Board Selection"
+source "arch/arm/mach-msm/lge/Kconfig.board"
+endmenu
+
+menu "LGE Specific Patches"
+
+config LGE_HANDLE_PANIC
+    tristate "Support LGE Kernel Panic Handler"
+    default n
+    depends on MACH_LGE
+    help
+    LGE Error handler.
+
+config LGE_HIDDEN_RESET
+	tristate "LGE hidden reset"
+	default n
+	depends on MACH_LGE && LGE_HANDLE_PANIC
+	help
+	  Enables support for LGE hidden reset. For turn on this feature,
+	  "echo 1 > /sys/module/lge_handle_panic/parameters/hreset_enable"
+	  or "lge_handle_panic.hreset_enable=1" from cmdline.
+
+config LGE_USES_SMD_DS_TTY
+    bool "Explicitly use smd tty driver for DS"
+    default n
+    depends on MSM_SMD_TTY && MACH_LGE
+    help
+        In Qualcomm MSM8960, smd tty driver for ds(/dev/smd0) is not used.
+        Say yes if this tty driver must be used on LGE device. This is used
+        to connect smd channel in user space(for example, ATCMD processing).
+
+# LG_BTUI : FX3_BT_bringup - kukdong.bae@lge.com [S]
+config LGE_BLUESLEEP
+    default n
+    bool "MSM8x60 LGE Bluetooth LPM"
+    depends on MACH_LGE
+# LG_BTUI : FX3_BT_bringup - kukdong.bae@lge.com [E]
+
+config LGE_QFPROM_INTERFACE
+    bool "Support qfprom interface"
+    default n
+    depends on MACH_LGE
+    help
+    LGE QFPROM DRIVER.
+
+config LGE_LCD_TUNING
+     bool "lcd_tuning"
+	 default n
+	 depends on MACH_LGE
+	 help
+		Support LCD tuning.
+
+config LGE_QC_LCDC_LUT
+     bool "Set initial Qualcomm LCDC lut"
+         default n
+         depends on MACH_LGE
+         help
+                Set initail Qualcomm LCDC Look Up Table.
+
+config LGE_KCAL
+     bool "Interface to calibrate LCD color temperature"
+         default n
+         depends on MACH_LGE
+         help
+                Interface to calibrate LCD color temperature
+
+config LGE_KCAL_QLUT
+     bool "Interface to calibrate LCD color temperature by QLUT"
+         default n
+         depends on MACH_LGE && LGE_QC_LCDC_LUT && LGE_KCAL
+         help
+                Interface to calibrate LCD color temperature by QLUT
+endmenu
+

@@ -269,6 +269,7 @@ struct msm_mctl_post_proc_cmd {
 #define MSM_CAMERA_LED_HIGH 2
 #define MSM_CAMERA_LED_INIT 3
 #define MSM_CAMERA_LED_RELEASE 4
+#define MSM_CAMERA_LED_TORCH 5  /*                                                                                                    */
 
 #define MSM_CAMERA_STROBE_FLASH_NONE 0
 #define MSM_CAMERA_STROBE_FLASH_XENON 1
@@ -285,6 +286,7 @@ struct msm_mctl_post_proc_cmd {
 #define MAX_ACTUATOR_TYPE_SIZE 32
 #define MAX_ACTUATOR_REG_TBL_SIZE 8
 
+#define MAX_AF_STEPS 60 //                                                                            
 
 #define MSM_MAX_CAMERA_CONFIGS 2
 
@@ -994,7 +996,19 @@ struct msm_snapshot_pp_status {
 #define CFG_CONFIG_VREG_ARRAY         52
 #define CFG_CONFIG_CLK_ARRAY          53
 #define CFG_GPIO_OP                   54
-#define CFG_MAX                       55
+/*                                                                   */
+#define CFG_SET_AEC_ROI_PARAMS        55
+#define CFG_SET_SOC_AWB_LOCK_PARAMS   56	/*                                                                  */
+#define CFG_SET_SOC_AEC_LOCK_PARAMS   57	/*                                                                  */
+#define CFG_GET_SOC_SNAPSHOT_DATA	  58
+/*                                                                                   */
+#if 1
+#define CFG_MOVE_FOCUS_MANUAL		  59
+#define CFG_MAX                       60
+#else
+#define CFG_MAX                       59
+#endif
+/*                                                                                   */
 
 
 #define MOVE_NEAR	0
@@ -1130,12 +1144,35 @@ enum msm_v4l2_contrast_level {
 
 
 enum msm_v4l2_exposure_level {
+	MSM_V4L2_EXPOSURE_N6,
+	MSM_V4L2_EXPOSURE_N5,
+	MSM_V4L2_EXPOSURE_N4,
+	MSM_V4L2_EXPOSURE_N3,
 	MSM_V4L2_EXPOSURE_N2,
 	MSM_V4L2_EXPOSURE_N1,
 	MSM_V4L2_EXPOSURE_D,
 	MSM_V4L2_EXPOSURE_P1,
 	MSM_V4L2_EXPOSURE_P2,
+	MSM_V4L2_EXPOSURE_P3,
+	MSM_V4L2_EXPOSURE_P4,
+	MSM_V4L2_EXPOSURE_P5,
+	MSM_V4L2_EXPOSURE_P6,
 };
+
+/*                                                                    */
+enum msm_v4l2_night_mode {
+	MSM_V4L2_NIGHT_MODE_OFF ,
+	MSM_V4L2_NIGHT_MODE_ON,
+};
+/*                                                                    */
+
+/*                                                                   */
+enum msm_v4l2_fps_range {
+	MSM_V4L2_FPS_15_15,
+	MSM_V4L2_FPS_7P5_30,
+	MSM_V4L2_FPS_30_30,
+};
+/*                                                                   */
 
 enum msm_v4l2_sharpness_level {
 	MSM_V4L2_SHARPNESS_L0,
@@ -1209,6 +1246,13 @@ struct sensor_pict_fps {
 	uint16_t pictfps;
 };
 
+/*                                                                          */
+struct snapshot_soc_data_cfg {
+	uint32_t iso_speed;
+	uint32_t exposure_time;
+};
+/*                                                                          */
+
 struct exp_gain_cfg {
 	uint16_t gain;
 	uint32_t line;
@@ -1268,6 +1312,19 @@ struct sensor_init_cfg {
 	uint8_t pict_res;
 };
 
+//Start :randy@qualcomm.com for calibration 2012.04.15
+#define ROLLOFF_CALDATA_SIZE    (17 * 13)
+typedef struct
+{
+    unsigned short           mesh_rolloff_table_size;     // TableSize
+    uint8_t                  r_gain[ROLLOFF_CALDATA_SIZE];   // RGain
+    uint8_t                  gr_gain[ROLLOFF_CALDATA_SIZE];  // GRGain
+    uint8_t                  gb_gain[ROLLOFF_CALDATA_SIZE];  // GBGain
+    uint8_t                  b_gain[ROLLOFF_CALDATA_SIZE];   // BGain
+	uint8_t					 red_ref[17];
+
+} rolloff_caldata_array_type;
+
 struct sensor_calib_data {
 	/* Color Related Measurements */
 	uint16_t r_over_g;
@@ -1280,7 +1337,11 @@ struct sensor_calib_data {
 	uint16_t stroke_amt;
 	uint16_t af_pos_1m;
 	uint16_t af_pos_inf;
+
+	/* Lens Shading Calibration Data */
+	rolloff_caldata_array_type rolloff;
 };
+//End :randy@qualcomm.com for calibration 2012.04.15
 
 enum msm_sensor_resolution_t {
 	MSM_SENSOR_RES_FULL,
@@ -1309,11 +1370,17 @@ struct sensor_output_info_t {
 	uint16_t num_info;
 };
 
+/*                                                                */
 struct msm_sensor_exp_gain_info_t {
 	uint16_t coarse_int_time_addr;
 	uint16_t global_gain_addr;
+	uint16_t digital_gain_addr_gr;
+	uint16_t digital_gain_addr_r;
+	uint16_t digital_gain_addr_gb;
+	uint16_t digital_gain_addr_b;
 	uint16_t vert_offset;
 };
+/*                                                                */
 
 struct msm_sensor_output_reg_addr_t {
 	uint16_t x_output;
@@ -1648,7 +1715,13 @@ struct sensor_cfg_data {
 		struct cord aec_cord;
 		int is_autoflash;
 		struct mirror_flip mirror_flip;
+		/*                                                                   */
+        int32_t aec_roi_pos;
+/*                                                                   */
+		int32_t soc_awb_lock;	/*                                                                         */
+		int32_t soc_aec_lock;	/*                                                                         */
 		void *setting;
+		struct snapshot_soc_data_cfg snapshot_data;
 	} cfg;
 };
 

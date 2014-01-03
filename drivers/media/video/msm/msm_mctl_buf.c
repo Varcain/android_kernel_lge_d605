@@ -122,6 +122,12 @@ static int msm_vb2_ops_buf_init(struct vb2_buffer *vb)
 	}
 	for (i = 0; i < vb->num_planes; i++) {
 		mem = vb2_plane_cookie(vb, i);
+//                                                      
+		if(mem == NULL){
+			pr_err("%s:mem is NULL, pcam_inst->vid_fmt.type=%d",__func__, pcam_inst->vid_fmt.type);
+			return -EINVAL;
+		}		
+//                                                     
 		if (buf_type == VIDEOBUF2_MULTIPLE_PLANES)
 			offset.data_offset =
 				pcam_inst->plane_info.plane[i].offset;
@@ -207,6 +213,7 @@ static void msm_vb2_ops_buf_cleanup(struct vb2_buffer *vb)
 	struct videobuf2_contig_pmem *mem;
 	struct msm_frame_buffer *buf, *tmp;
 	uint32_t i, vb_phyaddr = 0, buf_phyaddr = 0;
+    //uint32_t rc;   //QCT patch, Fix_IOMMU_and_VFE_bus_overflow, 2012-10-31, freeso.kim
 	unsigned long flags = 0;
 
 	pcam_inst = vb2_get_drv_priv(vb->vb2_queue);
@@ -218,7 +225,7 @@ static void msm_vb2_ops_buf_cleanup(struct vb2_buffer *vb)
 		for (i = 0; i < vb->num_planes; i++) {
 			mem = vb2_plane_cookie(vb, i);
 			if (!mem) {
-				D("%s Inst %p memory already freed up. return",
+				pr_err("%s Inst %p memory already freed up. return",
 					__func__, pcam_inst);
 				return;
 			}
@@ -239,7 +246,10 @@ static void msm_vb2_ops_buf_cleanup(struct vb2_buffer *vb)
 	} else {
 		mem = vb2_plane_cookie(vb, 0);
 		if (!mem)
+		{
+			pr_err("%s:mem is NULL, pcam_inst->vid_fmt.type=%d",__func__, pcam_inst->vid_fmt.type);
 			return;
+		}
 		D("%s: inst=0x%x, buf=0x%x, idx=%d\n", __func__,
 		(uint32_t)pcam_inst, (uint32_t)buf, vb->v4l2_buf.index);
 		vb_phyaddr = (unsigned long) videobuf2_to_pmem_contig(vb, 0);
@@ -259,15 +269,50 @@ static void msm_vb2_ops_buf_cleanup(struct vb2_buffer *vb)
 		spin_unlock_irqrestore(&pcam_inst->vq_irqlock, flags);
 	}
 	pmctl = msm_cam_server_get_mctl(pcam->mctl_handle);
-	if (pmctl == NULL) {
+		/*                                                                              */
+       if (pmctl == NULL || pmctl->client == NULL) {
 		pr_err("%s No mctl found\n", __func__);
 		buf->state = MSM_BUFFER_STATE_UNUSED;
 		return;
 	}
+/*                                                                              */
+	if (!get_server_use_count() &&
+		pmctl && pmctl->hardware_running) {
+		pr_err("%s: daemon crashed but hardware is still running\n",
+			   __func__);
+		if (pmctl->mctl_release) {
+			pr_err("%s: Releasing now\n", __func__);
+			/*do not send any commands to hardware
+			after reaching this point*/
+			pmctl->mctl_cmd = NULL;
+			pmctl->mctl_release(pmctl);
+			pmctl->mctl_release = NULL;
+			pmctl->hardware_running = 0;
+		}
+		else {
+			pr_err("%s: pmctl release is NULL\n", __func__);
+		}
+	} else {
+		pr_err("server use count %d, pmctl pointer %p, hardware_running %d\n", get_server_use_count(),
+		pmctl, pmctl->hardware_running);
+	}
+/*                                                                              */
 	for (i = 0; i < vb->num_planes; i++) {
 		mem = vb2_plane_cookie(vb, i);
+//                                                      
+		if(mem == NULL){
+			pr_err("%s:mem is NULL",__func__);
+			return;
+		}
+//                                                     
 		videobuf2_pmem_contig_user_put(mem, pmctl->client,
-			pmctl->domain_num);
+			pmctl->domain_num
+/*                                                               */
+#if defined(CONFIG_MACH_APQ8064_GK_KR) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+			, pcam_inst->is_closing
+#endif
+/*                                                             */
+			);
 	}
 	buf->state = MSM_BUFFER_STATE_UNUSED;
 }
@@ -385,6 +430,15 @@ struct msm_frame_buffer *msm_mctl_buf_find(
 			&pcam_inst->free_vq, list) {
 		buf_idx = buf->vidbuf.v4l2_buf.index;
 		mem = vb2_plane_cookie(&buf->vidbuf, 0);
+		
+//                                                      
+		if(mem == NULL){
+			pr_err("%s:mem is NULL, pcam_inst->vid_fmt.type=%d",__func__, pcam_inst->vid_fmt.type);
+			spin_unlock_irqrestore(&pcam_inst->vq_irqlock, flags);
+			return NULL;
+		}		
+//                                                     
+		
 		if (mem->buffer_type ==	VIDEOBUF2_MULTIPLE_PLANES)
 			offset = mem->offset.data_offset +
 				pcam_inst->buf_offset[buf_idx][0].data_offset;
@@ -669,6 +723,14 @@ int msm_mctl_reserve_free_buf(
 		pr_err("%s: stream is turned off\n", __func__);
 		return rc;
 	}
+	
+//                                                             
+	if(pcam_inst->free_vq.prev == NULL || pcam_inst->free_vq.next == NULL){
+		pr_err("%s: next= 0x%p, prev= 0x%p\n", __func__, pcam_inst->free_vq.next, pcam_inst->free_vq.prev);
+		return rc;
+	}
+//                                                             
+
 	spin_lock_irqsave(&pcam_inst->vq_irqlock, flags);
 	list_for_each_entry(buf, &pcam_inst->free_vq, list) {
 		if (buf->state != MSM_BUFFER_STATE_QUEUED)
@@ -681,6 +743,13 @@ int msm_mctl_reserve_free_buf(
 				pcam_inst->plane_info.num_planes;
 			for (i = 0; i < free_buf->num_planes; i++) {
 				mem = vb2_plane_cookie(&buf->vidbuf, i);
+//                                                             
+				if(mem == NULL){
+					pr_err("%s:mem is NULL, pcam_inst->vid_fmt.type=%d",__func__, pcam_inst->vid_fmt.type);
+					spin_unlock_irqrestore(&pcam_inst->vq_irqlock, flags);
+					return rc;
+				}
+//                                                             
 				if (mem->buffer_type ==
 						VIDEOBUF2_MULTIPLE_PLANES)
 					plane_offset =
@@ -693,6 +762,13 @@ int msm_mctl_reserve_free_buf(
 					__func__,
 					pcam_inst->buf_offset[buf_idx][i].
 					data_offset, plane_offset);
+				//QCT patch S, Fix_IOMMU_and_VFE_bus_overflow, 2012-10-31, freeso.kim	
+				if (pcam_inst->buf_offset[buf_idx][i].data_offset != 0 || plane_offset != 0) {
+				 pr_err("%s: data offset %d, plane_offset %d\n",
+				 __func__,
+				 pcam_inst->buf_offset[buf_idx][i].data_offset,
+				 plane_offset);
+				}
 				free_buf->ch_paddr[i] =	(uint32_t)
 				videobuf2_to_pmem_contig(&buf->vidbuf, i) +
 				pcam_inst->buf_offset[buf_idx][i].data_offset +
@@ -701,6 +777,14 @@ int msm_mctl_reserve_free_buf(
 			}
 		} else {
 			mem = vb2_plane_cookie(&buf->vidbuf, 0);
+//                                                             
+			if(mem == NULL){
+				pr_err("%s:mem is NULL, pcam_inst->vid_fmt.type=%d",__func__, pcam_inst->vid_fmt.type);
+				spin_unlock_irqrestore(&pcam_inst->vq_irqlock, flags);
+				return rc;
+			}
+//                                                             
+			
 			free_buf->ch_paddr[0] = (uint32_t)
 				videobuf2_to_pmem_contig(&buf->vidbuf, 0) +
 				mem->offset.sp_off.y_off;
@@ -864,12 +948,17 @@ static void __msm_mctl_unmap_user_frame(struct msm_cam_meta_frame *meta_frame,
 	for (i = 0; i < meta_frame->frame.num_planes; i++) {
 		D("%s Plane %d handle %p", __func__, i,
 			meta_frame->map[i].handle);
-		ion_unmap_iommu(client, meta_frame->map[i].handle,
-					domain_num, 0);
-		ion_free(client, meta_frame->map[i].handle);
+/*                                                                                              */
+	 if (meta_frame->map[i].handle != NULL) {
+                ion_unmap_iommu(client, meta_frame->map[i].handle,	domain_num, 0);
+		   ion_free(client, meta_frame->map[i].handle);
+		   meta_frame->map[i].handle = NULL;
+	}
+	else
+	     WARN(1,"Warnning : %s : This is not normal case\n", __func__);
+/*                                                                                              */
 	}
 }
-
 /* Map using ION APIs */
 static int __msm_mctl_map_user_frame(struct msm_cam_meta_frame *meta_frame,
 	struct ion_client *client, int domain_num)

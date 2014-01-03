@@ -15,6 +15,11 @@
 #include <linux/list.h>
 #include <linux/uaccess.h>
 #include <linux/slab.h>
+/*                                                                         */
+#if (1)
+#include <linux/delay.h>
+#endif
+/*                                                                         */
 #include <media/msm_gemini.h>
 #include "msm_gemini_sync.h"
 #include "msm_gemini_core.h"
@@ -260,7 +265,11 @@ void msm_gemini_err_irq(struct msm_gemini_device *pgmn_dev,
 
 	if (!rc)
 		GMN_PR_ERR("%s:%d] err err\n", __func__, __LINE__);
-
+	/*                                                                         */
+	#if (1)
+	pgmn_dev->core_reset = 1;
+	#endif
+	/*                                                                         */
 	return;
 }
 
@@ -468,8 +477,15 @@ int msm_gemini_input_buf_enqueue(struct msm_gemini_device *pgmn_dev,
 		return -1;
 	}
 
+	/*                                                                         */
+	#if (1)
+	GMN_DBG("%s:%d] 0x%08x %d mode %d\n", __func__, __LINE__,
+		(int) buf_cmd.vaddr, buf_cmd.y_len, pgmn_dev->op_mode);
+	#else
 	GMN_DBG("%s:%d] 0x%08x %d\n", __func__, __LINE__,
 		(int) buf_cmd.vaddr, buf_cmd.y_len);
+	#endif
+	/*                                                                         */
 
 	if (pgmn_dev->op_mode == MSM_GEMINI_MODE_REALTIME_ENCODE) {
 		rc = msm_iommu_map_contig_buffer(
@@ -554,6 +570,11 @@ int __msm_gemini_open(struct msm_gemini_device *pgmn_dev)
 		return -EBUSY;
 	}
 	pgmn_dev->open_count++;
+	/*                                                                         */
+	#if (1)
+	pgmn_dev->core_reset = 0;
+	#endif
+	/*                                                                         */
 	mutex_unlock(&pgmn_dev->lock);
 
 	msm_gemini_core_irq_install(msm_gemini_irq);
@@ -594,6 +615,19 @@ int __msm_gemini_release(struct msm_gemini_device *pgmn_dev)
 	mutex_unlock(&pgmn_dev->lock);
 
 	msm_gemini_core_release(release_buf);
+	/*                                                                         */
+	#if (1)
+	if (pgmn_dev->core_reset) {
+		GMN_PR_ERR(KERN_ERR "gemini core reset cfg %x mode %d",
+			msm_gemini_io_r(0x8),
+			pgmn_dev->op_mode);
+		wmb();
+		msm_gemini_io_w(0x4, 0x8000);
+		msleep(5);
+		wmb();
+	}
+	#endif
+	/*                                                                         */
 	msm_gemini_q_cleanup(&pgmn_dev->evt_q);
 	msm_gemini_q_cleanup(&pgmn_dev->output_rtn_q);
 	msm_gemini_outbuf_q_cleanup(&pgmn_dev->output_buf_q);
@@ -738,9 +772,13 @@ int msm_gemini_ioctl_reset(struct msm_gemini_device *pgmn_dev,
 		GMN_PR_ERR("%s:%d] failed\n", __func__, __LINE__);
 		return -EFAULT;
 	}
-
+	/*                                                                         */
+	#if (1)
+	pgmn_dev->op_mode = MSM_GEMINI_MODE_OFFLINE_ENCODE;
+	#else
 	pgmn_dev->op_mode = ctrl_cmd.type;
-
+	#endif
+	/*                                                                         */
 	rc = msm_gemini_core_reset(pgmn_dev->op_mode, pgmn_dev->base,
 		resource_size(pgmn_dev->mem));
 	return rc;

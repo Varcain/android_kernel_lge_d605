@@ -173,8 +173,13 @@ static void diag_smd_cntl_send_req(int proc_num)
 		while (count_bytes + HDR_SIZ <= r) {
 			type = *(uint32_t *)(buf);
 			data_len = *(uint32_t *)(buf + 4);
+#ifdef CONFIG_LGE_USB_LOCK_TRF
+			if (type < DIAG_CTRL_MSG_REG ||
+					 type > DIAG_CTRL_MSG_LGE_DIAG_LOCK) {
+#else
 			if (type < DIAG_CTRL_MSG_REG ||
 					 type > DIAG_CTRL_MSG_F3_MASK_V2) {
+#endif
 				pr_alert("diag: Invalid Msg type %d proc %d",
 					 type, proc_num);
 				break;
@@ -185,7 +190,17 @@ static void diag_smd_cntl_send_req(int proc_num)
 				break;
 			}
 			count_bytes = count_bytes+HDR_SIZ+data_len;
+#ifdef CONFIG_LGE_USB_LOCK_TRF
+			if(type == DIAG_CTRL_MSG_LGE_DIAG_LOCK) {
+				extern int set_diag_lock_status(int);
+				pr_info("DIAG_CTRL_MSG_LGE_DIAG_LOCK\n");
+				msg = buf+HDR_SIZ;
+				set_diag_lock_status(msg->cmd_code);
+				return;
+			} else if (type == DIAG_CTRL_MSG_REG && r >= count_bytes) {
+#else
 			if (type == DIAG_CTRL_MSG_REG && r >= count_bytes) {
+#endif
 				msg = buf+HDR_SIZ;
 				range = buf+HDR_SIZ+
 						sizeof(struct diag_ctrl_msg);

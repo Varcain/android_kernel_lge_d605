@@ -832,15 +832,30 @@ int mdp_set_core_clk(u32 rate);
 int mdp_clk_round_rate(u32 rate);
 
 unsigned long mdp_get_core_clk(void);
+#if defined(CONFIG_MDP_RUNTIME_BANDWIDTH)
+#else
 unsigned long mdp_perf_level2clk_rate(uint32 perf_level);
+#endif
 
 #ifdef CONFIG_MSM_BUS_SCALING
+#if defined(CONFIG_MDP_RUNTIME_BANDWIDTH)
+int mdp_bus_scale_update_request(u64 ab, u64 ib);
+#else
 int mdp_bus_scale_update_request(uint32_t index);
+#endif
+#else
+#if defined(CONFIG_MDP_RUNTIME_BANDWIDTH)
+static inline int mdp_bus_scale_update_request(u64 ab,
+					       u64 ib)
+{
+	return 0;
+}
 #else
 static inline int mdp_bus_scale_update_request(uint32_t index)
 {
 	return 0;
 }
+#endif
 #endif
 void mdp_dma_vsync_ctrl(int enable);
 void mdp_dma_video_vsync_ctrl(int enable);

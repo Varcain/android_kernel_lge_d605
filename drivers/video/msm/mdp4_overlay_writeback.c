@@ -261,6 +261,9 @@ static int mdp4_overlay_writeback_update(struct msm_fb_data_type *mfd)
 	pipe->dst_x = 0;
 
 	mdp4_overlay_mdp_pipe_req(pipe, mfd);
+#if defined(CONFIG_MDP_RUNTIME_BANDWIDTH)
+	mdp4_calc_blt_mdp_bw(mfd, pipe);
+#endif
 
 	if (mfd->display_iova)
 		pipe->srcp0_addr = mfd->display_iova + buf_offset;
@@ -471,7 +474,11 @@ void mdp4_writeback_overlay(struct msm_fb_data_type *mfd)
 	struct vsycn_ctrl *vctrl;
 	struct mdp4_overlay_pipe *pipe;
 
+#ifdef CONFIG_MACH_LGE //WBT
+	if ((!mfd) || (mfd && !mfd->panel_power_on))
+#else
 	if (mfd && !mfd->panel_power_on)
+#endif
 		return;
 
 	pr_debug("%s:+ mfd=%x\n", __func__, (int)mfd);

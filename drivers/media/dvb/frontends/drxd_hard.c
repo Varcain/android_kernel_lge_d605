@@ -1854,8 +1854,8 @@ static int SetFrequencyShift(struct drxd_state *state,
 	if (negativeShift)
 		state->fe_fs_add_incr = ((1 << 28) - state->fe_fs_add_incr);
 
-	/* Save the frequency shift without tunerOffset compensation
-	   for CtrlGetChannel. */
+	/*                                                          
+                        */
 	state->org_fe_fs_add_incr = MulDiv32(state->intermediate_freq,
 					     1 << 28, state->sys_clock_freq);
 	/* Remove integer part */

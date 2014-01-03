@@ -25,6 +25,9 @@
 #include <linux/mfd/pm8xxx/pm8921.h>
 #include <linux/mfd/pm8xxx/core.h>
 #include <linux/mfd/pm8xxx/regulator.h>
+#ifdef CONFIG_LGE_DIRECT_QCOIN_VIBRATOR
+#include <linux/mfd/pm8xxx/direct_qcoin.h>
+#endif
 
 #define REG_HWREV		0x002  /* PMIC4 revision */
 #define REG_HWREV_2		0x0E8  /* PMIC4 revision 2 */
@@ -374,7 +377,13 @@ static struct mfd_cell ccadc_cell __devinitdata = {
 };
 
 static struct mfd_cell vibrator_cell __devinitdata = {
+//                                                                       
+#if defined(CONFIG_TSPDRV)
+    .name           = "tspdrv",
+#else
 	.name           = PM8XXX_VIBRATOR_DEV_NAME,
+#endif
+//                                               
 	.id             = -1,
 };
 
@@ -614,6 +623,7 @@ pm8038_add_subdevices(const struct pm8038_platform_data *pdata,
 		}
 	}
 
+#ifdef CONFIG_PMIC8XXX_VIBRATOR
 	if (pdata->vibrator_pdata) {
 		vibrator_cell.platform_data = pdata->vibrator_pdata;
 		vibrator_cell.pdata_size =
@@ -624,6 +634,17 @@ pm8038_add_subdevices(const struct pm8038_platform_data *pdata,
 			goto bail;
 		}
 	}
+#endif
+
+//                                                                       
+#ifdef CONFIG_TSPDRV
+    ret = mfd_add_devices(pmic->dev, 0, &vibrator_cell, 1, NULL, 0);
+	if (ret) {
+		pr_err("Failed to add vibrator ret=%d\n", ret);
+		goto bail;
+	}
+#endif
+//                                               
 
 	if (pdata->spk_pdata) {
 		spk_cell.platform_data = pdata->spk_pdata;
@@ -722,7 +743,31 @@ pm8038_add_subdevices(const struct pm8038_platform_data *pdata,
 			goto bail;
 		}
 	}
-
+/*                                                 */
+#if 0 // CONFIG_PMIC8XXX_VIBRATOR
+    if (pdata->vibrator_pdata) {
+        vibrator_cell.platform_data = pdata->vibrator_pdata;
+        vibrator_cell.pdata_size =
+            sizeof(struct pm8xxx_vibrator_platform_data);
+        ret = mfd_add_devices(pmic->dev, 0, &vibrator_cell, 1, NULL, 0);
+        if (ret) {
+            pr_err("Failed to add vibrator ret=%d\n", ret);
+            goto bail;
+        }
+    }
+#endif
+#ifdef CONFIG_LGE_DIRECT_QCOIN_VIBRATOR
+    if (pdata->pm8xxx_qcoin_pdata) {
+		vibrator_cell.platform_data = pdata->pm8xxx_qcoin_pdata;
+		vibrator_cell.pdata_size =
+			sizeof(struct direct_qcoin_platform_data);
+		ret = mfd_add_devices(pmic->dev, 0, &vibrator_cell, 1, NULL, 0);
+		if (ret) {
+			pr_err("Failed to add vibrator subdevice ret=%d\n",ret);
+			goto bail;
+		}
+	}
+#endif
 	return 0;
 bail:
 	if (pmic->irq_chip) {

@@ -490,6 +490,34 @@ config SYNA_MULTI_TOUCH
 	depends on TOUCHSCREEN_SYNAPTICS_RMI4_I2C
 	default y
 
+# LGE_CHANGE
+config TOUCHSCREEN_SYNAPTICS_I2C_RMI4
+	tristate "Synaptics RMI4 protocol based I2C interface Touchscreen Driver"
+	help
+	  This enables support for Synaptics RMI4 protocol I2C interface Touchscreens.
+choice
+	prompt "Register map"
+	depends on TOUCHSCREEN_SYNAPTICS_I2C_RMI4
+
+config TOUCH_REG_MAP_TM1804
+	bool "TM1804"
+	depends on TOUCHSCREEN_SYNAPTICS_I2C_RMI4
+	help
+         Register map TM1804.
+config TOUCH_REG_MAP_TM1814
+	bool "TM1814"
+	depends on TOUCHSCREEN_SYNAPTICS_I2C_RMI4
+	help
+         Register map TM1804.
+endchoice
+
+# LGE_CHANGE
+config TOUCH_SYNAPTICS_FW_UPGRADE
+	bool "Synaptics ClearPad General F/W upgread"
+	depends on TOUCHSCREEN_SYNAPTICS_I2C_RMI4
+	help
+	  This enables support for Synaptics general F/W upgrade.
+
 config TOUCHSCREEN_TOUCHRIGHT
 	tristate "Touchright serial touchscreen"
 	select SERIO
@@ -933,6 +961,31 @@ config TOUCHSCREEN_CYTTSP_I2C_QC
          To compile this driver as a module, choose M here: the
          module will be called cyttsp-i2c.
 
+# LGE_CHANGE
+config TOUCHSCREEN_MMS128
+       tristate "MELFAS MMS-128 touchscreen"
+       depends on I2C
+       default n
+           help
+             Say Y here if you have the MELFAS MMS-128 touchscreen controller
+                 chip in your system.
+
+                 If unsure, say N.
+
+                 To compile this driver as a module, choose M here: the
+                 module will be called melfas_ts.         
+config TOUCHSCREEN_MELFAS_MMS134
+       tristate "MELFAS MMS-134 touchscreen"
+       depends on I2C
+       default n
+           help
+             Say Y here if you have the MELFAS MMS-134 touchscreen controller
+                 chip in your system.
+
+                 If unsure, say N.
+
+                 To compile this driver as a module, choose M here: the
+                 module will be called melfas_ts.
 config TOUCHSCREEN_FT5X06
        tristate "FocalTech touchscreens"
        depends on I2C
@@ -945,5 +998,97 @@ config TOUCHSCREEN_FT5X06
 
          To compile this driver as a module, choose M here: the
          module will be called ft5x06_ts.
+
+# LGE_CHANGE
+config LGE_TOUCHSCREEN_SYNAPTIC
+	bool "SYNAPTICS touchscreen"
+	default n
+	help
+		Say Y here if you have the SYNAPTICS touchscreen controller
+		chip in your system.
+
+config LGE_TOUCHSCREEN_SYNAPTIC_T3203
+    bool "SYNAPTICS T3203 touchscreen"
+    depends on I2C && LGE_TOUCHSCREEN_SYNAPTIC
+    default n
+    help 
+        Say Y here if you have the SYNAPTICS touchscreen controller
+        chip in your system.
+		 
+config LGE_TOUCHSCREEN_CORE
+	tristate "SYNAPTICS TOUCHSCREEN CORE "
+	depends on I2C && LGE_TOUCHSCREEN_SYNAPTIC
+	default y
+	help
+		Say Y here if you have the SYNAPTICS touchscreen controller
+		chip in your system.
+
+		If unsure, say N.
+
+		To compile this driver as a module, choose M here: the
+		module will be called SYNAPTICS_ts.
+
+config LGE_TOUCH_SYNAPTICS
+	tristate "SYNAPTICS SYNAPTICS"
+	depends on I2C && LGE_TOUCHSCREEN_SYNAPTIC
+	default y
+	help
+		Say Y here if you have the SYNAPTICS touchscreen controller
+		chip in your system.
+
+		If unsure, say N.
+
+		To compile this driver as a module, choose M here: the
+		module will be called SYNAPTICS_ts.
+
+config LGE_TOUCH_SYNAPTICS_FW_UPGRADE
+	tristate "SYNAPTICS FW UPGRADE "
+	depends on I2C && LGE_TOUCHSCREEN_SYNAPTIC
+	default y
+		help
+		Say Y here if you have the SYNAPTICS touchscreen controller
+		chip in your system.
+
+		If unsure, say N.
+
+		To compile this driver as a module, choose M here: the
+		module will be called SYNAPTICS_ts.
+		 
+config USING_TOVIS_PANEL_4_0
+	tristate "MELFAS MMS-136 touchscreen with TOVIS Panel for L2S board"
+	depends on TOUCHSCREEN_MMS128
+	default n
+	   help
+	     Say Y here if you have the MELFAS MMS-136 touchscreen controller
+		 chip in your system.
+
+		 If unsure, say N.
+
+		 To compile this driver as a module, choose M here: the
+		 module will be called melfas_ts.
+config TS_INFO_CLASS
+	   tristate "Use Ts info Class for unified PATH"
+	   depends on TOUCHSCREEN_MMS136 || TOUCHSCREEN_SYNAPTICS_I2C_RMI4 || TOUCHSCREEN_S3200_SYNAPTICS_TS || TOUCHSCREEN_MMS128
+       default n
+	   help
+	     Say Y here if you have the touchscreen info class in your system.
+
+		 If unsure, say N.
+
+		 To compile this driver as a module, choose M here: the
+		 module will be called ts info class.
+
+# LGE_CHANHE_S [hoseong.lge@lge.com] 2013-03-20, MAX1187x Touch for L9II Rev.A
+config TOUCHSCREEN_MAX1187X
+	tristate "Maxim MAX1187X touchscreen"
+	depends on I2C
+	help
+	  Say Y here if you have a Maxim MAX1187X touchscreen connected
+	  to your system. MAX1187X conforms to the Maxim Touch Protocol
+	  (MTP) defined by Maxim.
+
+	  If unsure, say N.	  
+
+# LGE_CHANHE_E [hoseong.lge@lge.com] 2013-03-20
 
 endif

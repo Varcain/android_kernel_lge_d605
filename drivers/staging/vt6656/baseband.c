@@ -661,17 +661,17 @@ const WORD awcFrameTime[MAX_RATE] =
 /*---------------------  Static Functions  --------------------------*/
 
 /*
-static
-unsigned long
-s_ulGetLowSQ3(PSDevice pDevice);
+      
+             
+                                
 
-static
-unsigned long
-s_ulGetRatio(PSDevice pDevice);
+      
+             
+                               
 
-static
-void
-s_vClearSQ3Value(PSDevice pDevice);
+      
+    
+                                   
 */
 
 /*---------------------  Export Variables  --------------------------*/

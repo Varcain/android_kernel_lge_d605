@@ -74,6 +74,12 @@ struct msm_gemini_device {
 	struct msm_gemini_q input_buf_q;
 
 	struct v4l2_subdev subdev;
+
+	/*                                                                         */
+	#if (1)
+	uint32_t core_reset;
+	#endif
+	/*                                                                         */
 };
 
 int __msm_gemini_open(struct msm_gemini_device *pgmn_dev);

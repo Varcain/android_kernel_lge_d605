@@ -141,6 +141,7 @@ config ARCH_MSM8X60
 	select MSM_PM8X60 if PM
 	select MSM_RUN_QUEUE_STATS
 	select ARM_HAS_SG_CHAIN
+	select MDP_RUNTIME_BANDWIDTH
 
 config ARCH_MSM8960
 	bool "MSM8960"
@@ -914,6 +915,9 @@ config MACH_FSM9XXX_SURF
 	  FFA board.
 
 endmenu
+
+# LGE_CHANGE
+source "arch/arm/mach-msm/lge/Kconfig"
 
 config MSM_STACKED_MEMORY
 	bool "Stacked Memory"
@@ -2153,6 +2157,10 @@ config MSM_BUS_SCALING
 	bool "Bus scaling driver"
 	default n
 
+config MDP_RUNTIME_BANDWIDTH
+	bool "MDP_RUNTIME_BANDWIDTH Bus scaling driver"
+	default n
+
 config MSM_BUS_RPM_MULTI_TIER_ENABLED
 	bool "RPM Multi-tiering Configuration"
 	depends on MSM_BUS_SCALING
@@ -2608,5 +2616,11 @@ config MSM_CPU_PWRCTL
 	  Droop detector mechanism can adversely affect krait plls during
 	  stand alone power collapse operation. Selecting this option
 	  ensures that they are always off.
+
+config FM_RADIO_MI2S_ENABLE
+	bool "Support MI2S for BCM FM RADIO"
+    default n
+    help
+    	Support MI2S for 3rd Party BCM4334 FM RADIO
 
 endif

@@ -40,12 +40,37 @@
 #endif
 #include "diag_dci.h"
 
+//for antenna bar test
+#if 1
+#include <linux/moduleparam.h>
+#include <linux/syscalls.h>
+#include <linux/fcntl.h> 
+#include <linux/fs.h>
+#include <linux/uaccess.h>
+
+#endif
 #define MODE_CMD		41
 #define RESET_ID		2
 #define ALL_EQUIP_ID		100
 #define ALL_SSID		-1
 #define MAX_SSID_PER_RANGE	100
 
+//                                            
+#ifdef CONFIG_LGE_MTS
+#include "mtsk_tty.h"
+#endif /*                */
+//                                            
+#ifdef CONFIG_LGE_USB_LOCK_TRF
+
+static int diag_lock_status = 0;
+
+int set_diag_lock_status(int enable)
+{
+	pr_info("%s, enable: %d", __func__, enable);
+	diag_lock_status = enable;
+	return 0;
+}
+#endif
 int diag_debug_buf_idx;
 unsigned char diag_debug_buf[1024];
 static unsigned int buf_tbl_size = 8; /*Number of entries in table of buffers */
@@ -53,6 +78,24 @@ struct diag_master_table entry;
 smd_channel_t *ch_temp = NULL, *chqdsp_temp = NULL, *ch_wcnss_temp = NULL;
 int diag_event_num_bytes;
 int diag_event_config;
+#ifndef CONFIG_LGE_UTS_DLL_GPS_CMD_FAIL
+static int exist_clr_gps_table=0;
+static int debugFlg = 0;
+#endif
+#ifdef CONFIG_LGE_USB_DIAG_DISABLE
+#include "diag_lock.h"
+#ifdef CONFIG_LGE_USB_DIAG_DISABLE_ONLY_MDM
+static int diag_enable = DIAG_DISABLE;
+#else
+static int diag_enable = DIAG_ENABLE;
+#endif
+void diagfwd_enable(int enable)
+{
+    diag_enable = enable;
+}
+EXPORT_SYMBOL(diagfwd_enable);
+#endif
+
 struct diag_send_desc_type send = { NULL, NULL, DIAG_STATE_START, 0 };
 struct diag_hdlc_dest_type enc = { NULL, NULL, 0 };
 struct mask_info {
@@ -250,6 +293,11 @@ void __diag_smd_send_req(void)
 	int *in_busy_ptr = NULL;
 	struct diag_request *write_ptr_modem = NULL;
 
+#ifdef CONFIG_LGE_USB_DIAG_DISABLE
+	//if (diag_enable == DIAG_ENABLE)
+	{
+#endif
+
 	if (!driver->in_busy_1) {
 		buf = driver->buf_in_1;
 		write_ptr_modem = driver->write_ptr_1;
@@ -291,6 +339,9 @@ void __diag_smd_send_req(void)
 		(driver->logging_mode == MEMORY_DEVICE_MODE)) {
 		chk_logging_wakeup();
 	}
+#ifdef CONFIG_LGE_USB_DIAG_DISABLE
+	}
+#endif
 }
 
 int diag_device_write(void *buf, int proc_num, struct diag_request *write_ptr)
@@ -307,8 +358,7 @@ int diag_device_write(void *buf, int proc_num, struct diag_request *write_ptr)
 #ifdef DIAG_DEBUG
 					pr_debug("diag: ENQUEUE buf ptr"
 						   " and length is %x , %d\n",
-						   (unsigned int)(driver->buf_
-				tbl[i].buf), driver->buf_tbl[i].length);
+						   (unsigned int)(driver->buf_tbl[i].buf), driver->buf_tbl[i].length);
 #endif
 					break;
 				}
@@ -395,6 +445,11 @@ int diag_device_write(void *buf, int proc_num, struct diag_request *write_ptr)
 						driver->write_ptr_svc);
 			} else
 				err = -1;
+//                                            
+#ifdef CONFIG_LGE_MTS
+		} else if(0 == mtsk_tty_process(buf, &(write_ptr->length), proc_num)) {
+#endif
+//                                            
 		} else if (proc_num == MODEM_DATA) {
 			write_ptr->buf = buf;
 #ifdef DIAG_DEBUG
@@ -517,6 +572,10 @@ void __diag_smd_qdsp_send_req(void)
 	void *buf = NULL;
 	int *in_busy_qdsp_ptr = NULL;
 	struct diag_request *write_ptr_qdsp = NULL;
+#ifdef CONFIG_LGE_USB_DIAG_DISABLE
+	//if (diag_enable == DIAG_ENABLE)
+	{
+#endif
 
 	if (!driver->in_busy_qdsp_1) {
 		buf = driver->buf_in_qdsp_1;
@@ -559,6 +618,9 @@ void __diag_smd_qdsp_send_req(void)
 		(driver->logging_mode == MEMORY_DEVICE_MODE)) {
 		chk_logging_wakeup();
 	}
+#ifdef CONFIG_LGE_USB_DIAG_DISABLE
+	}
+#endif
 }
 
 static void diag_print_mask_table(void)
@@ -1049,6 +1111,61 @@ void diag_send_msg_mask_update(smd_channel_t *ch, int updated_ssid_first,
 	mutex_unlock(&driver->diag_cntl_mutex);
 }
 
+#ifdef CONFIG_LGE_USB_DIAG_DISABLE
+extern void android_diaglock_work(void);
+extern void android_diagunlock_work(void);
+#endif
+
+#ifndef CONFIG_LGE_UTS_DLL_GPS_CMD_FAIL
+int chk_uts_clrgps_cmd(void)
+{
+	//pr_alert("diag:gps: chk_uts_clrgps_cmd()");
+	if ( 	(driver->hdlc_buf[0] == 0x4B) && 
+	     		(driver->hdlc_buf[1] == 0x0D) &&
+				(driver->hdlc_buf[2] == 0x06) &&
+					(driver->hdlc_buf[3] == 0x00) )
+	{
+		debugFlg=1; //debug log enable
+		pr_alert("diag:gps: chk_uts_clrgps_cmd()=true");
+		return 1;
+	}
+	else
+	{
+		debugFlg=0; //debug log disable
+		//pr_alert("diag:gps: chk_uts_clrgps_cmd()=false");
+		return 0;	
+	}
+}
+
+void diag_send_for_UtsClearGpsCmd(int index)
+{
+	int i;
+	
+	pr_alert("diag:gps: %s (idx=%d)\nBadCmdRXData:\n", __func__ , index);
+
+	for (i = 0; i < index; i++) {
+		//printk(KERN_DEBUG "\t%x", driver->hdlc_buf[i]);
+		printk("%2X ", driver->hdlc_buf[i]);
+	}
+
+	//good tx package
+	driver->apps_rsp_buf[0] = 0x4B;
+	driver->apps_rsp_buf[1] = 0x0D;
+	driver->apps_rsp_buf[2] = 0x06;
+	driver->apps_rsp_buf[3] = 0x00;
+	
+	pr_alert("diag:gps: GoodCmdRXData:\n");
+	for (i = 0; i<4; i++) {
+		//printk(KERN_DEBUG "\t%x", driver->apps_rsp_buf[i]);
+		printk("%2X ", driver->apps_rsp_buf[i]);
+	}
+	
+	//real tx data length -1
+	ENCODE_RSP_AND_SEND(3); 			
+
+}
+#endif
+
 static int diag_process_apps_pkt(unsigned char *buf, int len)
 {
 	uint16_t subsys_cmd_code;
@@ -1062,6 +1179,86 @@ static int diag_process_apps_pkt(unsigned char *buf, int len)
 	int payload_length;
 	unsigned char *ptr;
 #endif
+#ifdef CONFIG_MACH_LGE_FX3_VZW // CONFIG_DIAG_HW_REV
+	unsigned smem_size;
+	void *hw_rev_smem;
+	unsigned int hw_rev = 0;
+	char *rev_str[] = {"evb1", "evb2", "rev_a", "rev_b", "rev_c", "rev_d",
+                        "rev_e", "rev_f", "rev_g", "rev_10", "rev_11", "rev_12", "reserved"};
+#endif // CONFIG_DIAG_HW_REV
+
+#ifdef CONFIG_LGE_USB_DIAG_DISABLE
+    /* 0xA1(161) is portlock command */
+	if (buf[0] != 0xA1 && buf[0]!=0xA0 && diag_enable == DIAG_DISABLE) {
+		driver->apps_rsp_buf[0] = 24; /*0x18 Bad Mode */
+		ENCODE_RSP_AND_SEND(0);
+		return 0;
+	}
+#endif
+#ifdef CONFIG_LGE_USB_LOCK_TRF
+	if (buf[0] != 0xA1 && buf[0]!=0xA0 && diag_lock_status == 1) {
+		//pr_info("diag lock enabled!!!");
+		//pr_info("[JUYA]CMD_CODE: %X\n",buf[0]);
+		driver->apps_rsp_buf[0] = 24;
+		ENCODE_RSP_AND_SEND(0);
+		return 0;
+	}
+#endif
+
+#ifndef CONFIG_LGE_UTS_DLL_GPS_CMD_FAIL
+{
+	int CmdCode 				= (int)driver->hdlc_buf[0]; //4B
+	int SubSysId				= (int)driver->hdlc_buf[1]; //0D
+	uint16_t SubSysCmdCode 	= (uint16_t)( (driver->hdlc_buf[3]<<8) + driver->hdlc_buf[2] ); //0006
+
+	if (chk_uts_clrgps_cmd())
+	{
+		pr_alert("diag:gps: diag_process_apps_pkt :: Full RX Pkg :: RxD+CRC+7E.\n");
+		for (i = 0; i<(len+3); i++) { printk("%2X ", buf[i]); }
+
+		for (i = 0; i < diag_max_reg; i++) {
+			if ((driver->table[i].subsys_id==13) && (driver->table[i].cmd_code_hi==6)) {
+				exist_clr_gps_table = 1;
+				pr_alert("diag:gps: ---[%d]th Driver Table:: Exist CLR GPS CMD---\n",i); 
+			} 
+		}	
+
+		pr_alert("diag:gps: diag_process_apps_pkt :: exist_clr_gps_table=%d",exist_clr_gps_table);
+		//exist_clr_gps_table = 0;//testing
+		
+		if (exist_clr_gps_table != 1 ) {
+			//255(75)-13-0-6: CLR_GPS_UTS_DIAG_CMD
+			pr_alert("diag:gps: There is no UTS Clr GPS Cmd Set!"); 
+			
+			entry.cmd_code = 255;
+			entry.subsys_id = 13;
+			entry.cmd_code_lo =6;
+			entry.cmd_code_hi =6;
+			entry.process_id =-1;
+			entry.client_id =0;
+			#if 0
+			driver->table[580].cmd_code=255;
+			driver->table[580].subsys_id=13;
+			driver->table[580].client_id=0;
+			driver->table[580].cmd_code_lo=6;
+			driver->table[580].cmd_code_hi=6;
+			driver->table[580].process_id=-1;	
+			#endif
+			data_type = APPS_DATA;
+
+			for (i = 0; i < diag_max_reg; i++) 
+				pr_alert("diag:gps:*table[%d]=[cmd:%d][sub:%d][subcmd:%d][pid:%d][cid:%d]\n", i, driver->table[i].cmd_code, driver->table[i].subsys_id, driver->table[i].cmd_code_lo, driver->table[i].process_id, driver->table[i].client_id);
+
+			pr_alert("diag:gps: CmdCode %d SubSysId %d SubSysCmdCode %d",CmdCode,SubSysId,SubSysCmdCode); 
+			pr_alert("diag:gps: I will send New Clr Gps Cmd Set."); 
+			diag_send_data(entry, buf, len, data_type);
+			exist_clr_gps_table=0;
+			return 0;
+		}
+	}
+}
+#endif
+
 
 	/* Set log masks */
 	if (*buf == 0x73 && *(int *)(buf+4) == 3) {
@@ -1195,7 +1392,13 @@ static int diag_process_apps_pkt(unsigned char *buf, int len)
 				diag_send_msg_mask_update(driver->ch_wcnss_cntl,
 					 ssid_first, ssid_last, WCNSS_PROC);
 			ENCODE_RSP_AND_SEND(8 + ssid_range - 1);
-			return 0;
+#ifndef CONFIG_LGE_SLATE
+            printk(KERN_INFO "[SLATE] Key Logging mask received. NOT fx3s, returning..");
+            return 0;
+#else
+            printk(KERN_INFO "[SLATE] Key Logging mask received. Propagate this msg to APPS..");
+#endif
+
 		} else
 			buf = temp;
 #endif
@@ -1277,6 +1480,23 @@ static int diag_process_apps_pkt(unsigned char *buf, int len)
 		}
 #endif
 	}
+#ifdef CONFIG_MACH_LGE_FX3_VZW // CONFIG_DIAG_HW_REV
+	else if ((*buf == 0x26) && (*(buf+1) == 0x6C) && (*(buf+2) == 0x84)) {
+		hw_rev_smem = smem_get_entry(SMEM_ID_VENDOR0, &smem_size);
+		hw_rev = *(unsigned int *)hw_rev_smem;
+#if defined(CONFIG_DIAG_OVER_USB)
+		if (chk_apps_only()) {
+			driver->apps_rsp_buf[0] = 0x26;
+			driver->apps_rsp_buf[1] = 0x6C;
+			driver->apps_rsp_buf[2] = 0x84;
+			memcpy((driver->apps_rsp_buf+3), rev_str[hw_rev], strlen(rev_str[hw_rev]));
+			ENCODE_RSP_AND_SEND(132);
+			return 0;
+		} else
+			buf = temp;
+#endif
+	}
+#endif // CONFIG_DIAG_HW_REV
 	/* Check for registered clients and forward packet to apropriate proc */
 	cmd_code = (int)(*(char *)buf);
 	temp++;
@@ -1290,6 +1510,20 @@ static int diag_process_apps_pkt(unsigned char *buf, int len)
 		if (subsys_id != RESET_ID)
 			data_type = MODEM_DATA;
 	}
+
+#ifdef CONFIG_LGE_USB_DIAG_DISABLE
+	if (cmd_code == 0xA1)
+	{
+		if (subsys_id == 0x01)
+		{
+			android_diaglock_work();
+		}
+		else if (subsys_id == 0x02)
+		{
+			android_diagunlock_work();
+		}
+	}
+#endif
 
 	pr_debug("diag: %d %d %d", cmd_code, subsys_id, subsys_cmd_code);
 	for (i = 0; i < diag_max_reg; i++) {
@@ -1616,6 +1850,11 @@ void diag_send_error_rsp(int index)
 static inline void diag_send_error_rsp(int index) {}
 #endif
 
+#ifdef CONFIG_LGE_DIAG_TABLE_UPDATE_TWICE   
+static unsigned char bLimitCount;    
+extern short mts_tty_cable_info (void);   
+#endif  
+
 void diag_process_hdlc(void *data, unsigned len)
 {
 	struct diag_hdlc_decode_type hdlc;
@@ -1642,8 +1881,44 @@ void diag_process_hdlc(void *data, unsigned len)
 					   DUMP_PREFIX_ADDRESS, data, len, 1);
 		driver->debug_flag = 0;
 	}
+	
+#ifdef CONFIG_LGE_DIAG_TABLE_UPDATE_TWICE   
+//changmuk.lee 2013.01.23 - Sometime control command is not registered in table  1676 
+//                          This error make bad response. In this case we have to register it again.                   
+  if( bLimitCount == 0 && type == 1 && mts_tty_cable_info() == 7)  // do it only calibration case(130K)   
+  {   
+      if (driver->ch_cntl){   
+         //do it just one time   
+         bLimitCount++;   
+         diag_send_event_mask_update(driver->ch_cntl, 1 );   
+         msleep(25);   
+      }   
+      type = diag_process_apps_pkt(driver->hdlc_buf,   
+                            hdlc.dest_idx - 3);   
+       }   
+#endif //                                     
+	
 	/* send error responses from APPS for Central Routing */
 	if (type == 1 && chk_apps_only()) {
+
+#ifndef CONFIG_LGE_UTS_DLL_GPS_CMD_FAIL
+		if (chk_uts_clrgps_cmd())
+		{
+			//if (driver->ch_cntl) {	 
+			//	diag_send_event_mask_update(driver->ch_cntl, 1 );	 
+			//	msleep(25);   
+			//}	
+			//type = diag_process_apps_pkt(driver->hdlc_buf, 
+			//				hdlc.dest_idx - 3);	 
+			if (type) {
+				pr_alert("diag:gps: Bad command>Retry Register>Failure!");			
+				diag_send_for_UtsClearGpsCmd(hdlc.dest_idx);
+			}
+			else
+				pr_alert("diag:gps: Bad command>Retry Register>Success!");			
+		}
+		else
+#endif		
 		diag_send_error_rsp(hdlc.dest_idx);
 		type = 0;
 	}
@@ -1687,6 +1962,10 @@ int diagfwd_connect(void)
 {
 	int err;
 
+//                                            
+	printk(KERN_DEBUG "$MTSUSB1\n");
+//                                            
+
 	printk(KERN_DEBUG "diag: USB connected\n");
 	err = usb_diag_alloc_req(driver->legacy_ch, N_LEGACY_WRITE,
 			N_LEGACY_READ);
@@ -1724,6 +2003,10 @@ int diagfwd_connect(void)
 
 int diagfwd_disconnect(void)
 {
+//                                            
+	printk(KERN_DEBUG "$MTSUSB0\n");
+//                                            
+
 	printk(KERN_DEBUG "diag: USB disconnected\n");
 	driver->usb_connected = 0;
 	driver->debug_flag = 1;
@@ -1857,9 +2140,11 @@ void diag_usb_legacy_notifier(void *priv, unsigned event,
 {
 	switch (event) {
 	case USB_DIAG_CONNECT:
+		//WARN(1, "[%s] USB_DIAG_CONNECT\n", __func__);
 		diagfwd_connect();
 		break;
 	case USB_DIAG_DISCONNECT:
+		//WARN(1, "[%s] USB_DIAG_DISCONNECT\n", __func__);
 		diagfwd_disconnect();
 		break;
 	case USB_DIAG_READ_DONE:
@@ -2292,3 +2577,49 @@ void diagfwd_exit(void)
 	kfree(driver->user_space_data);
 	destroy_workqueue(driver->diag_wq);
 }
+//for antenna bar test
+#if 1
+static int dummy_arg_on;
+
+static int antbar_write(const char *val, struct kernel_param *kp)
+{
+    unsigned char string;
+    
+    sscanf(val,"%s",&string);
+    printk(KERN_ERR "khlee : write : %c \n", string);
+
+    
+	return 0;	 
+}
+
+static int antbar_read(char *buf, struct kernel_param *kp)
+{
+    int fd;
+    int read_byte = 0;
+    char read_data = 0;
+    mm_segment_t old_fs =  get_fs();
+
+    set_fs(get_ds());
+    if((fd = sys_open((const char __user *)"/data/data/com.example.antbartest/files/Level.txt", O_CREAT | O_RDWR, 0777) ) < 0 )
+    {
+        printk(KERN_ERR "[antbar test] Can not open file. fd = %x\n", fd);
+        sys_close(fd);
+        set_fs(old_fs);
+        return -1;
+    }
+
+    read_byte = sys_read(fd, (char __user *) &read_data, sizeof(char));
+    
+
+    printk(KERN_ERR "khlee : read %c\n", read_data);
+    sys_close(fd);
+    set_fs(old_fs);
+
+   	driver->apps_rsp_buf[0] = read_data; /* error code 13 */
+	ENCODE_RSP_AND_SEND(1);
+	return 0;
+}
+
+module_param_call(antbar_test, antbar_write, antbar_read, &dummy_arg_on, 0665);
+
+#endif

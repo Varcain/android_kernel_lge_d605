@@ -6,6 +6,8 @@ obj-$(CONFIG_MSM_CAMERA) += io/
 ifeq ($(CONFIG_MSM_CAMERA_V4L2),y)
   EXTRA_CFLAGS += -Idrivers/media/video/msm/cci
   EXTRA_CFLAGS += -Idrivers/media/video/msm/csi
+# LGE_CHANGE
+  EXTRA_CFLAGS += -Idrivers/media/video/msm/io
   EXTRA_CFLAGS += -Idrivers/media/video/msm/eeprom
   EXTRA_CFLAGS += -Idrivers/media/video/msm/sensors
   EXTRA_CFLAGS += -Idrivers/media/video/msm/actuators
@@ -22,6 +24,10 @@ endif
 obj-$(CONFIG_MSM_CAMERA) += vfe/
 obj-$(CONFIG_MSM_CAMERA) += msm_axi_qos.o gemini/ mercury/ jpeg_10/
 obj-$(CONFIG_MSM_CAMERA_FLASH) += flash.o
+# LGE_CHANGE
+obj-$(CONFIG_MSM_CAMERA_FLASH_LM3559) += flash_lm3559.o
+# LGE_CHANGE
+obj-$(CONFIG_LEDS_AS364X) += flash_as3647.o
 ifeq ($(CONFIG_MSM_CAMERA_V4L2),y)
   obj-$(CONFIG_ARCH_MSM8X60) += msm_vpe.o
   obj-$(CONFIG_ARCH_MSM7X30) += msm_vpe.o msm_axi_qos.o
@@ -45,6 +51,9 @@ ifneq ($(CONFIG_MSM_CAMERA_V4L2),y)
   obj-$(CONFIG_WEBCAM_OV9726) += ov9726.o ov9726_reg.o
   obj-$(CONFIG_OV5647) += ov5647.o ov5647_reg.o
   obj-$(CONFIG_S5K4E1) += s5k4e1.o s5k4e1_reg.o
+# LGE_CHANGE
+  obj-$(CONFIG_HI543) += hi543.o hi543_reg.o
+  obj-$(CONFIG_S5K4E5YA) += s5k4e1.o s5k4e1_reg.o
   obj-$(CONFIG_WEBCAM_OV7692) += ov7692.o
   obj-$(CONFIG_WEBCAM_OV7692_QRD) += ov7692_qrd.o
 endif

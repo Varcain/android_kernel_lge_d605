@@ -412,18 +412,18 @@ exit:
 
 } /* end ChannelValid */
 
-/************************************************************************
- * CHvChannelGetList
- * Get Available Channel List for a given country
- * Input:
- *      CountryCode     =   The country code defined in country.h
- * Output:
- *      ChannelBitMask  =   (QWORD *) correspondent bit mask
- *                          of available channels
- *                          0x0000000000000001 means channel 1 is supported
- *                          0x0000000000000003 means channel 1,2 are supported
- *                          0x000000000000000F means channel 1,2,..15 are supported
- ************************************************************************/
+/*                                                                       
+                    
+                                                 
+         
+                                                                 
+          
+                                                            
+                                                 
+                                                                           
+                                                                              
+                                                                                   
+                                                                        */
 BOOL
 CHvChannelGetList (
       unsigned int       uCountryCodeIdx,

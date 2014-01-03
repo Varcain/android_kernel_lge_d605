@@ -548,6 +548,9 @@ int mdp4_lcdc_on(struct platform_device *pdev)
 	pipe->bpp = bpp;
 
 	mdp4_overlay_mdp_pipe_req(pipe, mfd);
+#if defined(CONFIG_MDP_RUNTIME_BANDWIDTH)
+	mdp4_calc_blt_mdp_bw(mfd, pipe);
+#endif
 
 	atomic_set(&vctrl->suspend, 0);
 

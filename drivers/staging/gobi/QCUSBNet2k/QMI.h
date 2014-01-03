@@ -151,7 +151,7 @@ int GetQMIMessageID(
 // Get size of buffer needed for QMUX
 u16 QMUXHeaderSize( void );
 
-// Get size of buffer needed for QMUX + QMICTLGetClientIDReq
+//                                                          
 u16 QMICTLGetClientIDReqSize( void );
 
 // Get size of buffer needed for QMUX + QMICTLReleaseClientIDReq

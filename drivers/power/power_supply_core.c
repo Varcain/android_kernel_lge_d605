@@ -140,10 +140,11 @@ static void power_supply_changed_work(struct work_struct *work)
 	spin_lock_irqsave(&psy->changed_lock, flags);
 	if (psy->changed) {
 		psy->changed = false;
-		spin_unlock_irqrestore(&psy->changed_lock, flags);
 
 		class_for_each_device(power_supply_class, NULL, psy,
 				      __power_supply_changed_work);
+
+		spin_unlock_irqrestore(&psy->changed_lock, flags);
 
 		power_supply_update_leds(psy);
 

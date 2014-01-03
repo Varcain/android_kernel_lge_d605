@@ -1,0 +1,8 @@
+#
+# Include the specific Kconfig file for LGE board
+#
+
+# lgps9
+source "arch/arm/mach-msm/lge/lgps9/Kconfig"
+# fx3
+source "arch/arm/mach-msm/lge/fx3/Kconfig"

@@ -53,6 +53,38 @@ struct pm8xxx_rtc {
 	spinlock_t ctrl_reg_lock;
 };
 
+/*                          */
+static struct device *pm8xxx_rtc_rtc_dev  = NULL;
+static int rtc_reset = 0;
+static int pm8xxx_rtc_set_time(struct device *dev, struct rtc_time *tm);
+static int pm8xxx_rtc_reset(const char *val, struct kernel_param *kp)
+{
+  int ret = param_set_int(val, kp);
+  if (ret)
+    return ret;
+
+  if (!pm8xxx_rtc_rtc_dev)
+    return -EINVAL;
+
+  if (rtc_reset == 700102) {
+    struct rtc_time tm;
+    int ret;
+
+    /* set to 1970/01/02 (The Earliest Supported Time on Android) */
+    memset ((void *)&tm, 0x00, sizeof(struct rtc_time));
+    tm.tm_year = 70;
+    tm.tm_mday = 2;
+    tm.tm_yday = 2;
+    tm.tm_wday = 5; /* Saturday */
+    ret = pm8xxx_rtc_set_time (pm8xxx_rtc_rtc_dev, &tm);
+    if (ret == 0)
+      printk(KERN_INFO "%s: success!\n", __func__);
+  }
+  return 0;
+}
+module_param_call(rtc_reset, pm8xxx_rtc_reset, param_get_int, &rtc_reset, S_IWUSR | S_IRUGO);
+/*              */
+
 /*
  * The RTC registers need to be read/written one byte at a time. This is a
  * hardware limitation.
@@ -472,6 +504,9 @@ static int __devinit pm8xxx_rtc_probe(struct platform_device *pdev)
 	}
 
 	rtc_dd->ctrl_reg = ctrl_reg;
+	/*              */
+	pm8xxx_rtc_rtc_dev = rtc_dd->rtc_dev;
+	/*              */
 	if (rtc_write_enable == true)
 		pm8xxx_rtc_ops.set_time = pm8xxx_rtc_set_time;
 

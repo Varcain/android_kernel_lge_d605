@@ -208,12 +208,22 @@ struct msm_camera_i2c_conf {
 	enum msm_camera_i2c_mux_mode i2c_mux_mode;
 };
 
+/*            */
+#if !(defined(CONFIG_MACH_LGE_FX3_VZW) || defined(CONFIG_MACH_LGE_FX3_TMUS) || defined(CONFIG_MACH_LGE_F6_TMUS) || defined(CONFIG_MACH_LGE_FX3_WCDMA_TRF_US) || defined(CONFIG_MACH_LGE_L9II_COMMON)|| defined(CONFIG_F6_CAM8M) || defined(CONFIG_MACH_LGE_FX3Q_TMUS))
 enum msm_camera_vreg_name_t {
 	CAM_VDIG,
-	CAM_VIO,
 	CAM_VANA,
+	CAM_VIO,
 	CAM_VAF,
 };
+#else
+enum msm_camera_vreg_name_t {
+	CAM_VIO,
+	CAM_VANA,
+	CAM_VDIG,
+	CAM_VAF,
+};
+#endif
 
 struct msm_camera_sensor_platform_info {
 	int mount_angle;
@@ -378,7 +388,15 @@ struct msm_panel_common_pdata {
 	int gpio;
 	bool bl_lock;
 	spinlock_t bl_spinlock;
+
+//                                                       
+//#if defined(CONFIG_MACH_MSM8930_FX3)
+#if defined(CONFIG_MACH_MSM8930_FX3) && !defined(CONFIG_BACKLIGHT_LM3639)
+//                                                       
+	char enable_wled_bl_ctrl;
+#else
 	int (*backlight_level)(int level, int max, int min);
+#endif
 	int (*pmic_backlight)(int level);
 	int (*rotate_panel)(void);
 	int (*backlight) (int level, int mode);
@@ -391,6 +409,34 @@ struct msm_panel_common_pdata {
 	struct msm_bus_scale_pdata *mdp_bus_scale_table;
 #endif
 	int mdp_rev;
+
+//                                                       
+/*
+#if defined(CONFIG_FB_MSM_MIPI_DSI_HITACHI) ||\
+	defined(CONFIG_FB_MSM_MIPI_DSI_HIMAX) ||\
+	defined(CONFIG_FB_MSM_MIPI_DSI_LGD) ||\
+	defined(CONFIG_FB_MSM_MIPI_DSI_TX11D108VM) ||\
+	defined(CONFIG_FB_MSM_MIPI_LGIT_VIDEO_WVGA_INVERSE_PT_PANEL) ||\
+	defined(CONFIG_FB_MSM_MIPI_LGIT_CMD_WVGA_INVERSE_PT_PANEL) ||\
+	defined(CONFIG_FB_MSM_MIPI_R61529_VIDEO_HVGA_PT_PANEL) ||\
+	defined(CONFIG_FB_MSM_MIPI_R61529_CMD_HVGA_PT_PANEL)
+*/
+#if defined(CONFIG_FB_MSM_MIPI_DSI_HITACHI) ||\
+	defined(CONFIG_FB_MSM_MIPI_DSI_HIMAX) ||\
+	defined(CONFIG_FB_MSM_MIPI_DSI_LGD) ||\
+	defined(CONFIG_FB_MSM_MIPI_DSI_TX11D108VM) ||\
+	defined(CONFIG_FB_MSM_MIPI_LGIT_VIDEO_WVGA_INVERSE_PT_PANEL) ||\
+	defined(CONFIG_FB_MSM_MIPI_LGIT_CMD_WVGA_INVERSE_PT_PANEL) ||\
+	defined(CONFIG_FB_MSM_MIPI_R61529_VIDEO_HVGA_PT_PANEL) ||\
+	defined(CONFIG_FB_MSM_MIPI_R61529_CMD_HVGA_PT_PANEL)||\
+	defined(CONFIG_FB_MSM_MIPI_DSI_TX13D107VM)	
+//                                                       
+	void *power_on_set;
+	void *power_off_set;
+	ssize_t power_on_set_size;
+	ssize_t power_off_set_size;
+	int max_backlight_level;
+#endif
 	u32 ov0_wb_size;  /* overlay0 writeback size */
 	u32 ov1_wb_size;  /* overlay1 writeback size */
 	u32 mem_hid;
@@ -398,6 +444,16 @@ struct msm_panel_common_pdata {
 	u32 splash_screen_addr;
 	u32 splash_screen_size;
 	char mdp_iommu_split_domain;
+#ifdef CONFIG_LGE_LCD_TUNING
+	/*           
+                                        
+                                    
+  */
+	int (*read_regset)(unsigned long);
+	int (*write_regset)(unsigned long);
+	int (*read_porch)(unsigned long);
+	int (*write_porch)(unsigned long);
+#endif
 };
 
 
@@ -476,6 +532,9 @@ struct msm_fb_platform_data {
 	int (*allow_set_offset)(void);
 	char prim_panel_name[PANEL_NAME_MAX_LEN];
 	char ext_panel_name[PANEL_NAME_MAX_LEN];
+#ifdef CONFIG_LGE_LCD_TUNING
+	u32 *porch;
+#endif
 };
 
 struct msm_hdmi_platform_data {
@@ -542,6 +601,7 @@ struct msm_vidc_platform_data {
 	int cont_mode_dpb_count;
 	int disable_turbo;
 	unsigned long fw_addr;
+	int vote_high_bw; /*                                                                                                       */
 };
 
 struct vcap_platform_data {

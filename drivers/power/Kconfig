@@ -415,6 +415,69 @@ config PM8921_BMS
 	help
 	  Say Y here to enable support for pm8921 chip bms subdevice
 
+config LGE_PM
+	tristate "PM8921 LGE Feature"
+	depends on MFD_PM8921_CORE
+	default n
+	help
+	  Say Y here to enable support for pm8921 chip lge feature
+
+config LGE_PM_435V_BATT
+	bool "LGE 4.35V Battery Feature"
+	help
+	  Say Y here to enable support for High Cell Voltage Battery.
+
+config BATTERY_MAX17043
+	tristate "Maxim MAX17043 Fuel Gauge"
+	depends on I2C && LGE_PM
+	default n
+	help
+	  MAX17043 is fuel-gauge systems for lithium-ion (Li+) batteries
+	  in handheld and portable equipment. The MAX17043 is configured
+	  to operate with a single lithium cell
+
+config LGE_PM_BATTERY_ID_CHECKER
+	depends on LGE_PM
+	default n
+	bool "LGE PM BATTERY ID CHECKER"
+	help
+	  LGE PM Battery Id Checker Configuration
+
+config LGE_CHARGER_TEMP_SCENARIO
+	depends on LGE_PM
+	default n
+	bool "LGE CHARGER TEMP SCENARIO Configuration"
+	help
+	  LGE CHARGER TEMP SCENARIO Configuration
+
+config LGE_PM_TEMP_SENSOR
+	depends on LGE_PM
+	default n
+	bool "LGE additional temp sensor for thermal optimization"
+	help
+	  Say Y to support to use additional temp sensor
+
+config LGE_PM_VZW_FAST_CHG
+	depends on LGE_PM
+	default n
+	bool "LGE PM Verizon Fast Charging"
+	help
+	Say Y to support Verizon Fast Charging
+
+config LGE_PM_BOOST_IC
+	depends on LGE_PM
+	default n
+	bool "LGE Boost ic"
+	help
+	  Say Y to support boost ic for using it
+
+config LGE_PM_TRKLCHG_IN_KERNEL
+        depends on LGE_PM
+        default n
+        bool "LGE PM Trickle Charging In Kernel"
+        help
+        Say Y to enable trickle charging in kernel
+
 config BATTERY_BCL
 	tristate "Battery Current Limit driver"
 	help

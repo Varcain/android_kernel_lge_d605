@@ -25,6 +25,7 @@
 #define CSID_VERSION_V2                      0x02000011
 #define CSID_VERSION_V3                      0x30000000
 
+/*            */
 #define DBG_CSID 0
 
 #define TRUE   1
@@ -96,7 +97,8 @@ static int msm_csid_config(struct csid_device *csid_dev,
 		return -EINVAL;
 	}
 
-	CDBG("%s csid_params, lane_cnt = %d, lane_assign = %x, phy sel = %d\n",
+	/*                                                         */
+	pr_err("%s csid_params, lane_cnt = %d, lane_assign = %x, phy sel = %d\n",
 		__func__,
 		csid_params->lane_cnt,
 		csid_params->lane_assign,
@@ -130,7 +132,8 @@ static irqreturn_t msm_csid_irq(int irq_num, void *data)
 		return IRQ_HANDLED;
 	}
 	irq = msm_camera_io_r(csid_dev->base + CSID_IRQ_STATUS_ADDR);
-	CDBG("%s CSID%d_IRQ_STATUS_ADDR = 0x%x\n",
+  /*            */
+	pr_err("%s CSID%d_IRQ_STATUS_ADDR = 0x%x\n",
 		 __func__, csid_dev->pdev->id, irq);
 	if (irq & (0x1 << CSID_RST_DONE_IRQ_BITSHIFT))
 			complete(&csid_dev->reset_complete);
@@ -425,7 +428,9 @@ static long msm_csid_cmd(struct csid_device *csid_dev, void *arg)
 		pr_err("%s: %d failed\n", __func__, __LINE__);
 		return -EFAULT;
 	}
-	CDBG("%s cfgtype = %d\n", __func__, cdata.cfgtype);
+
+	/*                                                         */
+	pr_err("%s cfgtype = %d\n", __func__, cdata.cfgtype);
 	switch (cdata.cfgtype) {
 	case CSID_INIT:
 		rc = msm_csid_init(csid_dev, &cdata.cfg.csid_version);

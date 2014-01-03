@@ -1593,7 +1593,7 @@ struct saa7134_board saa7134_boards[] = {
 		},
 	},
 	[SAA7134_BOARD_ZOLID_XPERT_TV7134] = {
-		/* Helge Jensen <helge.jensen@slog.dk> */
+		/*                                     */
 		.name           = ":Zolid Xpert TV7134",
 		.audio_clock    = 0x00187de7,
 		.tuner_type     = TUNER_PHILIPS_NTSC,

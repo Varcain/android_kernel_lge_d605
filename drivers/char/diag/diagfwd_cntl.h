@@ -29,7 +29,9 @@
 #define DIAG_CTRL_MSG_EVENT_MASK_V2	10
 /* Send Diag F3 mask */
 #define DIAG_CTRL_MSG_F3_MASK_V2	11
-
+#ifdef CONFIG_LGE_USB_LOCK_TRF
+#define DIAG_CTRL_MSG_LGE_DIAG_LOCK	12
+#endif
 struct cmd_code_range {
 	uint16_t cmd_code_lo;
 	uint16_t cmd_code_hi;

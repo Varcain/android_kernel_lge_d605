@@ -27,7 +27,10 @@
 #include <mach/peripheral-loader.h>
 #include "smd_private.h"
 #include "ramdump.h"
-
+#if defined(CONFIG_LGE_HANDLE_PANIC) 
+#include <mach/restart.h>
+#include <mach/board_lge.h>
+#endif
 #define MODULE_NAME			"wcnss_8960"
 #define MAX_BUF_SIZE			0x51
 
@@ -39,6 +42,23 @@ static int riva_crash;
 static int ss_restart_inprogress;
 static int enable_riva_ssr;
 static struct subsys_device *riva_8960_dev;
+
+/*            */
+#if 0 /* riva_smsm_cb_fn is removed on 1031 */
+static void riva_smsm_cb_fn(struct work_struct *work)
+{
+	if (!enable_riva_ssr)
+	{
+#if defined(CONFIG_LGE_HANDLE_PANIC)
+		lge_set_magic_for_subsystem("riva");
+		msm_set_restart_mode(0x6d632130);
+#endif
+		panic(MODULE_NAME ": SMSM reset request received from Riva");
+	}
+	else
+		subsystem_restart("riva");
+}
+#endif
 
 static void smsm_state_cb_hdlr(void *data, uint32_t old_state,
 					uint32_t new_state)
@@ -62,7 +82,13 @@ static void smsm_state_cb_hdlr(void *data, uint32_t old_state,
 	}
 
 	if (!enable_riva_ssr)
+	{
+#if defined(CONFIG_LGE_HANDLE_PANIC)
+	        lge_set_magic_for_subsystem("riva");
+		msm_set_restart_mode(0x6d632130);
+#endif
 		panic(MODULE_NAME ": SMSM reset request received from Riva");
+	}
 
 	smem_reset_reason = smem_get_entry(SMEM_SSR_REASON_WCNSS0,
 			&smem_reset_size);

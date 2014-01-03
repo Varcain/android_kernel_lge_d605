@@ -57,6 +57,7 @@ MODULE_ALIAS("mmc:block");
 #define INAND_CMD38_ARG_SECERASE 0x80
 #define INAND_CMD38_ARG_SECTRIM1 0x81
 #define INAND_CMD38_ARG_SECTRIM2 0x88
+#define MMC_BLK_TIMEOUT_MS  (10 * 60 * 1000)        /* 10 minute timeout */
 
 #define MMC_SANITIZE_REQ_TIMEOUT 240000 /* msec */
 
@@ -121,7 +122,12 @@ struct mmc_blk_data {
 	struct device_attribute force_ro;
 	struct device_attribute power_ro_lock;
 	struct device_attribute num_wr_reqs_to_start_packing;
-	struct device_attribute min_sectors_to_check_bkops_status;
+/*            */
+#ifndef BKOPS_UPDATE
+	struct device_attribute bkops_check_threshold;	
+#else    
+    struct device_attribute min_sectors_to_check_bkops_status;
+#endif
 	int	area_type;
 };
 
@@ -306,6 +312,67 @@ num_wr_reqs_to_start_packing_store(struct device *dev,
 	mmc_blk_put(md);
 	return count;
 }
+/*            */
+#ifndef BKOPS_UPDATE
+static ssize_t
+bkops_check_threshold_show(struct device *dev,
+				  struct device_attribute *attr, char *buf)
+{
+	struct mmc_blk_data *md = mmc_blk_get(dev_to_disk(dev));
+	struct mmc_card *card = md->queue.card;
+	int ret;
+
+	if (!card)
+		return -EINVAL;
+    else
+	    ret = snprintf(buf, PAGE_SIZE, "%d\n",
+		       card->bkops_info.size_percentage_to_queue_delayed_work);
+
+	mmc_blk_put(md);
+	return ret;
+}
+
+static ssize_t
+bkops_check_threshold_store(struct device *dev,
+				 struct device_attribute *attr,
+				 const char *buf, size_t count)
+{
+	int value;
+	struct mmc_blk_data *md = mmc_blk_get(dev_to_disk(dev));
+	struct mmc_card *card = md->queue.card;
+    unsigned int card_size;
+    int ret = count;
+
+    if (!card) {
+        ret = -EINVAL;
+        goto exit;
+    }
+
+	sscanf(buf, "%d", &value);
+   if ((value <= 0) || (value >= 100)) {
+           ret = -EINVAL;
+           goto exit;
+   }
+
+   card_size = (unsigned int)get_capacity(md->disk);
+   if (card_size <= 0) {
+           ret = -EINVAL;
+           goto exit;
+   }
+   card->bkops_info.size_percentage_to_queue_delayed_work = value;
+   card->bkops_info.min_sectors_to_queue_delayed_work =
+           (card_size * value) / 100;
+
+   pr_debug("%s: size_percentage = %d, min_sectors = %d",
+                   mmc_hostname(card->host),
+                   card->bkops_info.size_percentage_to_queue_delayed_work,
+                   card->bkops_info.min_sectors_to_queue_delayed_work);
+ 
+exit:
+	mmc_blk_put(md);
+	return count;
+}
+#else
 
 static ssize_t
 min_sectors_to_check_bkops_status_show(struct device *dev,
@@ -348,6 +415,7 @@ min_sectors_to_check_bkops_status_store(struct device *dev,
 	mmc_blk_put(md);
 	return count;
 }
+#endif
 
 static int mmc_blk_open(struct block_device *bdev, fmode_t mode)
 {
@@ -1152,11 +1220,25 @@ static int mmc_blk_err_check(struct mmc_card *card,
 	 */
 	if (!mmc_host_is_spi(card->host) && rq_data_dir(req) != READ) {
 		u32 status;
+		unsigned long timeout;
+
+		timeout = jiffies + msecs_to_jiffies(MMC_BLK_TIMEOUT_MS);
 		do {
 			int err = get_card_status(card, &status, 5);
 			if (err) {
 				pr_err("%s: error %d requesting status\n",
 				       req->rq_disk->disk_name, err);
+				return MMC_BLK_CMD_ERR;
+			}
+
+			/* Timeout if the device never becomes ready for data
+			 * and never leaves the program state.
+			 */
+			if (time_after(jiffies, timeout)) {
+				pr_err("%s: Card stuck in programming state!"\
+					" %s %s\n", mmc_hostname(card->host),
+					req->rq_disk->disk_name, __func__);
+
 				return MMC_BLK_CMD_ERR;
 			}
 			/*
@@ -2032,9 +2114,20 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 	}
 #endif
 
+/*            */
+#ifndef BKOPS_UPDATE
+	if (req && !mq->mqrq_prev->req) {
+		/* claim host only for the first request */
+		mmc_claim_host(card->host);
+		if (card->ext_csd.bkops_en)
+			mmc_stop_bkops(card);
+	}
+
+#else
 	if (req && !mq->mqrq_prev->req)
 		/* claim host only for the first request */
 		mmc_claim_host(card->host);
+#endif
 
 	ret = mmc_blk_part_switch(card, md);
 	if (ret) {
@@ -2070,9 +2163,19 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
 	}
 
 out:
+/*            */
+#ifndef BKOPS_UPDATE
+	if (!req){
+        if (mmc_card_need_bkops(card))
+                mmc_start_bkops(card, false);
+		/* release host only when there are no more requests */
+	    	mmc_release_host(card->host);
+    }
+#else
 	if (!req)
 		/* release host only when there are no more requests */
 		mmc_release_host(card->host);
+#endif
 	return ret;
 }
 
@@ -2091,7 +2194,11 @@ static struct mmc_blk_data *mmc_blk_alloc_req(struct mmc_card *card,
 {
 	struct mmc_blk_data *md;
 	int devidx, ret;
-
+/*            */
+#ifndef BKOPS_UPDATE    
+	unsigned int percentage =
+		BKOPS_SIZE_PERCENTAGE_TO_QUEUE_DELAYED_WORK;
+#endif
 	devidx = find_first_zero_bit(dev_use, max_devices);
 	if (devidx >= max_devices)
 		return ERR_PTR(-ENOSPC);
@@ -2167,6 +2274,12 @@ static struct mmc_blk_data *mmc_blk_alloc_req(struct mmc_card *card,
 
 	blk_queue_logical_block_size(md->queue.queue, 512);
 	set_capacity(md->disk, size);
+/*            */
+#ifndef BKOPS_UPDATE
+	card->bkops_info.size_percentage_to_queue_delayed_work = percentage;
+	card->bkops_info.min_sectors_to_queue_delayed_work =
+		((unsigned int)size * percentage) / 100;
+#endif
 
 	if (mmc_host_cmd23(card->host)) {
 		if (mmc_card_mmc(card) ||
@@ -2359,7 +2472,25 @@ static int mmc_add_disk(struct mmc_blk_data *md)
 				 &md->num_wr_reqs_to_start_packing);
 	if (ret)
 		goto num_wr_reqs_to_start_packing_fail;
+    
+/*            */
+#ifndef BKOPS_UPDATE
+	md->bkops_check_threshold.show = bkops_check_threshold_show;
+	md->bkops_check_threshold.store = bkops_check_threshold_store;
+	sysfs_attr_init(&md->bkops_check_threshold.attr);
+	md->bkops_check_threshold.attr.name = "bkops_check_threshold";
+	md->bkops_check_threshold.attr.mode = S_IRUGO | S_IWUSR;
+	ret = device_create_file(disk_to_dev(md->disk),
+				 &md->bkops_check_threshold);
+	if (ret)
+		goto bkops_check_threshold_fails;
 
+	return ret;
+
+bkops_check_threshold_fails:
+	device_remove_file(disk_to_dev(md->disk),
+		   &md->num_wr_reqs_to_start_packing);
+#else
 	md->min_sectors_to_check_bkops_status.show =
 		min_sectors_to_check_bkops_status_show;
 	md->min_sectors_to_check_bkops_status.store =
@@ -2378,6 +2509,7 @@ static int mmc_add_disk(struct mmc_blk_data *md)
 min_sectors_to_check_bkops_status_fails:
 	device_remove_file(disk_to_dev(md->disk),
 			   &md->num_wr_reqs_to_start_packing);
+#endif
 num_wr_reqs_to_start_packing_fail:
 	device_remove_file(disk_to_dev(md->disk), &md->power_ro_lock);
 power_ro_lock_fail:
@@ -2391,6 +2523,7 @@ force_ro_fail:
 #define CID_MANFID_SANDISK	0x2
 #define CID_MANFID_TOSHIBA	0x11
 #define CID_MANFID_MICRON	0x13
+#define CID_MANFID_SKHYNIX	0x90
 
 static const struct mmc_fixup blk_fixups[] =
 {
@@ -2419,7 +2552,13 @@ static const struct mmc_fixup blk_fixups[] =
 		  MMC_QUIRK_BLK_NO_CMD23),
 	MMC_FIXUP("MMC32G", CID_MANFID_TOSHIBA, CID_OEMID_ANY, add_quirk_mmc,
 		  MMC_QUIRK_BLK_NO_CMD23),
-
+#if 0 // it seems to be some thing wrong with eMMC.
+		  #ifdef CONFIG_MACH_LGE
+/* Not supported for the packed command on Hynix v4.41 */
+	MMC_FIXUP("H4G1d", CID_MANFID_SKHYNIX, CID_OEMID_ANY, add_quirk_mmc,
+			  MMC_QUIRK_BLK_NO_CMD23),
+#endif
+#endif
 	/*
 	 * Some Micron MMC cards needs longer data read timeout than
 	 * indicated in CSD.

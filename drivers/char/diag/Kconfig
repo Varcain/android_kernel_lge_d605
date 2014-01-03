@@ -20,6 +20,18 @@ config DIAG_OVER_USB
 	 This feature helps segregate code required for DIAG traffic to go over USB.
 endmenu
 
+# LGE_CHANGE
+menu "SLATE Support"
+
+config LGE_SLATE
+	bool "Enable SLATE Key Logging message routing"
+		depends on DIAG_OVER_USB
+	default y
+	help
+	This feature helps decide whether slate key logging start message would be routed to apps or not.
+endmenu
+
+
 menu "SDIO support for DIAG"
 
 config DIAG_SDIO_PIPE
@@ -39,3 +51,62 @@ config DIAG_BRIDGE_CODE
 	help
 	 SMUX/HSIC Transport Layer for DIAG Router
 endmenu
+
+# LGE_CHANGE_S
+menu "LGE DM APP Support"
+
+config LGE_DM_APP
+	bool "LGE DM APP Support"
+	default n
+	depends on MACH_LGE
+	help
+	 LGE DM APP Support
+endmenu
+
+menu "USB Diag Disable"
+
+config LGE_USB_DIAG_DISABLE
+	default n
+	bool "Disable diag function"
+	help
+	 Provide method of diag enable or disable
+endmenu
+
+menu "USB Only MDM Diag Disable"
+
+config LGE_USB_DIAG_DISABLE_ONLY_MDM
+	default n
+	bool "Disable Only MDM Diag function"
+	help
+	 Provide method of MDM diag enable or disable
+endmenu
+
+menu "LGE DIAG MTS Daemon Support"
+
+config LGE_MTS
+	bool "LGE Diag MTS Daemon Support"
+	default n
+	depends on MACH_LGE
+	help
+	 LGE DIAG MTS Support
+endmenu
+
+menu "LGE DIAG table update twice"  
+
+config LGE_DIAG_TABLE_UPDATE_TWICE  
+   bool "LGE DIAG table update twice"  
+   default n  
+   depends on MACH_LGE  
+   help  
+   LGE DIAG table twice  
+endmenu 
+
+menu "LGE USB LOCK for TRF"  
+
+config LGE_USB_LOCK_TRF
+   bool "LGE USB LOCK TRF enable"  
+   default n  
+   help  
+   provice LGE USB LOCK for TRF
+endmenu 
+# LGE_CHANGE_E

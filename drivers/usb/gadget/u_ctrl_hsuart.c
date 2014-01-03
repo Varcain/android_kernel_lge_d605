@@ -19,6 +19,7 @@
 #include <linux/debugfs.h>
 #include <linux/smux.h>
 
+#include <mach/usb_bridge.h>
 #include <mach/usb_gadget_xport.h>
 
 #define CH_OPENED 0
@@ -537,9 +538,13 @@ static int ghsuart_ctrl_debugfs_init(void)
 	if (!ghsuart_ctrl_dent || IS_ERR(ghsuart_ctrl_dent))
 		return -ENODEV;
 
+	/*           
+                                              
+                                   
+  */
 	ghsuart_ctrl_dfile =
 		debugfs_create_file("status", S_IRUGO | S_IWUSR,
-				ghsuart_ctrl_dent, 0, &gctrl_stats_ops);
+				ghsuart_ctrl_dent, 0, &ghsuart_ctrl_stats_ops);
 	if (!ghsuart_ctrl_dfile || IS_ERR(ghsuart_ctrl_dfile)) {
 		debugfs_remove(ghsuart_ctrl_dent);
 		ghsuart_ctrl_dent = NULL;

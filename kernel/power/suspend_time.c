@@ -23,7 +23,11 @@
 #include <linux/time.h>
 
 static struct timespec suspend_time_before;
-static unsigned int time_in_suspend_bins[32];
+
+//            
+// This value can be overflowed by suspend_time_debug_show.
+//static unsigned int time_in_suspend_bins[32];
+static unsigned int time_in_suspend_bins[33];
 
 #ifdef CONFIG_DEBUG_FS
 static int suspend_time_debug_show(struct seq_file *s, void *data)
@@ -31,7 +35,14 @@ static int suspend_time_debug_show(struct seq_file *s, void *data)
 	int bin;
 	seq_printf(s, "time (secs)  count\n");
 	seq_printf(s, "------------------\n");
+
+//                   
+#if 1
+	for (bin = 0; bin < 33; bin++) {
+#else
 	for (bin = 0; bin < 32; bin++) {
+#endif
+//           
 		if (time_in_suspend_bins[bin] == 0)
 			continue;
 		seq_printf(s, "%4d - %4d %4u\n",

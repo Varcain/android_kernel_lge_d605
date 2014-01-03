@@ -125,10 +125,36 @@ enum power_supply_property {
 	POWER_SUPPLY_PROP_TIME_TO_FULL_AVG,
 	POWER_SUPPLY_PROP_TYPE, /* use power_supply.type instead */
 	POWER_SUPPLY_PROP_SCOPE,
+#ifdef CONFIG_LGE_PM_BATTERY_ID_CHECKER
+	POWER_SUPPLY_PROP_BATTERY_ID_CHECK,
+#endif
 	/* Properties of type `const char *' */
 	POWER_SUPPLY_PROP_MODEL_NAME,
 	POWER_SUPPLY_PROP_MANUFACTURER,
 	POWER_SUPPLY_PROP_SERIAL_NUMBER,
+/* [START] sungsookim */
+#ifdef CONFIG_LGE_PM
+	POWER_SUPPLY_PROP_PSEUDO_BATT,
+	POWER_SUPPLY_PROP_BLOCK_CHARGING,
+	POWER_SUPPLY_PROP_EXT_PWR_CHECK,
+#ifdef CONFIG_MACH_LGE_FX3_VZW
+	POWER_SUPPLY_PROP_STOP_CHG_UPON_EXPIRY,
+#endif
+#endif
+/* [END] */
+#ifdef CONFIG_LGE_PM_VZW_FAST_CHG
+	POWER_SUPPLY_PROP_VZW_CHG_STATE,
+#endif
+
+
+
+#if defined(CONFIG_MACH_LGE_L9II_COMMON)
+
+/*                                                                     */
+	POWER_SUPPLY_PROP_OFF_BATT,
+/*                                                                   */
+
+#endif
 };
 
 enum power_supply_type {

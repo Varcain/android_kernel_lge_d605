@@ -272,6 +272,9 @@ struct dcs_cmd_req {
 	struct dsi_cmd_desc *cmds;
 	int cmds_cnt;
 	u32 flags;
+#if defined(CONFIG_MACH_LGE) && defined(CONFIG_FB_MSM_MIPI_HIMAX_H8379A_VIDEO_WVGA_PT)
+	struct dsi_buf *rbuf;
+#endif
 	int rlen;	/* rx length */
 	fxn cb;
 };
@@ -291,14 +294,18 @@ void mipi_dsi_lane_cfg(void);
 void mipi_dsi_bist_ctrl(void);
 int mipi_dsi_buf_alloc(struct dsi_buf *, int size);
 int mipi_dsi_cmd_dma_add(struct dsi_buf *dp, struct dsi_cmd_desc *cm);
+#ifndef CONFIG_FB_MSM_MIPI_HIMAX_H8379A_VIDEO_WVGA_PT
 int mipi_dsi_cmds_tx(struct dsi_buf *dp, struct dsi_cmd_desc *cmds, int cnt);
 
 int mipi_dsi_cmd_dma_tx(struct dsi_buf *dp);
+#endif
 int mipi_dsi_cmd_reg_tx(uint32 data);
+#ifndef CONFIG_FB_MSM_MIPI_HIMAX_H8379A_VIDEO_WVGA_PT
 int mipi_dsi_cmds_rx(struct msm_fb_data_type *mfd,
 			struct dsi_buf *tp, struct dsi_buf *rp,
 			struct dsi_cmd_desc *cmds, int len);
 int mipi_dsi_cmd_dma_rx(struct dsi_buf *tp, int rlen);
+#endif
 void mipi_dsi_host_init(struct mipi_panel_info *pinfo);
 void mipi_dsi_op_mode_config(int mode);
 void mipi_dsi_cmd_mode_ctrl(int enable);

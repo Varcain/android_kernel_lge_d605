@@ -496,175 +496,175 @@ HCF_STATIC hcf_16* BASED xxxx[ ] = {
  ************************** T O P   L E V E L   H C F   R O U T I N E S **************************************
  ************************************************************************************************************/
 
-/************************************************************************************************************
- *
- *.MODULE        int hcf_action( IFBP ifbp, hcf_16 action )
- *.PURPOSE       Changes the run-time Card behavior.
- *               Performs Miscellanuous actions.
- *
- *.ARGUMENTS
- *   ifbp                    address of the Interface Block
- *   action                  number identifying the type of change
- *    - HCF_ACT_INT_FORCE_ON enable interrupt generation by WaveLAN NIC
- *    - HCF_ACT_INT_OFF      disable interrupt generation by WaveLAN NIC
- *    - HCF_ACT_INT_ON       compensate 1 HCF_ACT_INT_OFF, enable interrupt generation if balance reached
- *    - HCF_ACT_PRS_SCAN     Hermes Probe Respons Scan (F102) command
- *    - HCF_ACT_RX_ACK       acknowledge non-DMA receiver to Hermes
- *    - HCF_ACT_SCAN         Hermes Inquire Scan (F101) command (non-WARP only)
- *    - HCF_ACT_SLEEP        DDS Sleep request
- *    - HCF_ACT_TALLIES      Hermes Inquire Tallies (F100) command
- *
- *.RETURNS
- *   HCF_SUCCESS             all (including invalid)
- *   HCF_INT_PENDING         HCF_ACT_INT_OFF, interrupt pending
- *   HCF_ERR_NO_NIC          HCF_ACT_INT_OFF, NIC presence check fails
- *
- *.CONDITIONS
- * Except for hcf_action with HCF_ACT_INT_FORCE_ON or HCF_ACT_INT_OFF as parameter or hcf_connect with an I/O
- * address (i.e. not HCF_DISCONNECT), all hcf-function calls MUST be preceded by a call of hcf_action with
- * HCF_ACT_INT_OFF as parameter.
- * Note that hcf_connect defaults to NIC interrupt disabled mode, i.e. as if hcf_action( HCF_ACT_INT_OFF )
- * was called.
- *
- *.DESCRIPTION
- * hcf_action supports the following mode changing action-code pairs that are antonyms
- *    - HCF_ACT_INT_[FORCE_]ON / HCF_ACT_INT_OFF
- *
- * Additionally hcf_action can start the following actions in the NIC:
- *    - HCF_ACT_PRS_SCAN
- *    - HCF_ACT_RX_ACK
- *    - HCF_ACT_SCAN
- *    - HCF_ACT_SLEEP
- *    - HCF_ACT_TALLIES
- *
- * o HCF_ACT_INT_OFF: Sets NIC Interrupts mode Disabled.
- * This command, and the associated [Force] Enable NIC interrupts command, are only available if the HCF_INT_ON
- * compile time option is not set at 0x0000.
- *
- * o HCF_ACT_INT_ON: Sets NIC Interrupts mode Enabled.
- * Enable NIC Interrupts, depending on the number of preceding Disable NIC Interrupt calls.
- *
- * o HCF_ACT_INT_FORCE_ON: Force NIC Interrupts mode Enabled.
- * Sets NIC Interrupts mode Enabled, regardless off the number of preceding Disable NIC Interrupt calls.
- *
- * The disabling and enabling of interrupts are antonyms.
- * These actions must be balanced.
- * For each "disable interrupts" there must be a matching "enable interrupts".
- * The disable interrupts may be executed multiple times in a row without intervening enable interrupts, in
- * other words, the disable interrupts may be nested.
- * The interrupt generation mechanism is disabled at the first call with HCF_ACT_INT_OFF.
- * The interrupt generation mechanism is re-enabled when the number of calls with HCF_ACT_INT_ON matches the
- * number of calls with INT_OFF.
- *
- * It is not allowed to have more Enable NIC Interrupts calls than Disable NIC Interrupts calls.
- * The interrupt generation mechanism is initially (i.e. after hcf_connect) disabled.
- * An MSF based on a interrupt strategy must call hcf_action with INT_ON in its initialization logic.
- *
- *!  The INT_OFF/INT_ON housekeeping is initialized at 0x0000 by hcf_connect, causing the interrupt generation
- *   mechanism to be disabled at first. This suits MSF implementation based on a polling strategy.
- *
- * o HCF_ACT_SLEEP: Initiates the Disconnected DeepSleep process
- * This command is only available if the HCF_DDS compile time option is set. It triggers the F/W to start the
- * sleep handshaking. Regardless whether the Host initiates a Disconnected DeepSleep (DDS) or the F/W initiates
- * a Connected DeepSleep (CDS), the Host-F/W sleep handshaking is completed when the NIC Interrupts mode is
- * enabled (by means of the balancing HCF_ACT_INT_ON), i.e. at that moment the F/W really goes into sleep mode.
- * The F/W is wokenup by the HCF when the NIC Interrupts mode are disabled, i.e. at the first HCF_ACT_INT_OFF
- * after going into sleep.
- *
- * The following Miscellanuous actions are defined:
- *
- * o HCF_ACT_RX_ACK: Receiver Acknowledgement (non-DMA, non-USB mode only)
- * Acking the receiver, frees the NIC memory used to hold the Rx frame and allows the F/W to
- * report the existence of the next Rx frame.
- * If the MSF does not need access (any longer) to the current frame, e.g. because it is rejected based on the
- * look ahead or copied to another buffer, the receiver may be acked. Acking earlier is assumed to have the
- * potential of improving the performance.
- * If the MSF does not explitly ack te receiver, the acking is done implicitly if:
- * - the received frame fits in the look ahead buffer, by the hcf_service_nic call that reported the Rx frame
- * - if not in the above step, by hcf_rcv_msg (assuming hcf_rcv_msg is called)
- * - if neither of the above implicit acks nor an explicit ack by the MSF, by the first hcf_service_nic after
- *   the hcf_service_nic that reported the Rx frame.
- * Note: If an Rx frame is already acked, an explicit ACK by the MSF acts as a NoOperation.
- *
- * o HCF_ACT_TALLIES: Inquire Tallies command
- * This command is only operational if the F/W is enabled.
- * The Inquire Tallies command requests the F/W to provide its current set of tallies.
- * See also hcf_get_info with CFG_TALLIES as parameter.
- *
- * o HCF_ACT_PRS_SCAN: Inquire Probe Respons Scan command
- * This command is only operational if the F/W is enabled.
- * The Probe Respons Scan command starts a scan sequence.
- * The HCF puts the result of this action in an MSF defined buffer (see CFG_RID_LOG_STRCT).
- *
- * o HCF_ACT_SCAN: Inquire Scan command
- * This command is only supported for HII F/W (i.e. pre-WARP) and it is operational if the F/W is enabled.
- * The Inquire Scan command starts a scan sequence.
- * The HCF puts the result of this action in an MSF defined buffer (see CFG_RID_LOG_STRCT).
- *
- * Assert fails if
- * - ifbp has a recognizable out-of-range value.
- * - NIC interrupts are not disabled while required by parameter action.
- * - an invalid code is specified in parameter action.
- * - HCF_ACT_INT_ON commands outnumber the HCF_ACT_INT_OFF commands.
- * - reentrancy, may be  caused by calling hcf_functions without adequate protection against NIC interrupts or
- *   multi-threading
- *
- * - Since the HCF does not maintain status information relative to the F/W enabled state, it is not asserted
- *   whether HCF_ACT_SCAN, HCF_ACT_PRS_SCAN or HCF_ACT_TALLIES are only used while F/W is enabled.
- *
- *.DIAGRAM
- * 0: The assert embedded in HCFLOGENTRY checks against re-entrancy. Re-entrancy could be caused by a MSF logic
- *   at task-level calling hcf_functions without shielding with HCF_ACT_ON/_OFF. However the HCF_ACT_INT_OFF
- *   action itself can per definition not be protected this way. Based on code inspection, it can be concluded,
- *   that there is no re-entrancy PROBLEM in this particular flow. It does not seem worth the trouble to
- *   explicitly check for this condition (although there was a report of an MSF which ran into this assert.
- * 2:IFB_IntOffCnt is used to balance the INT_OFF and INT_ON calls.  Disabling of the interrupts is achieved by
- *   writing a zero to the Hermes IntEn register.  In a shared interrupt environment (e.g. the mini-PCI NDIS
- *   driver) it is considered more correct to return the status HCF_INT_PENDING if and only if, the current
- *   invocation of hcf_service_nic is (apparently) called in the ISR when the ISR was activated as result of a
- *   change in HREG_EV_STAT matching a bit in HREG_INT_EN, i.e. not if invoked as result of another device
- *   generating an interrupt on the shared interrupt line.
- *   Note 1: it has been observed that under certain adverse conditions on certain platforms the writing of
- *   HREG_INT_EN can apparently fail, therefor it is paramount that HREG_INT_EN is written again with 0 for
- *   each and every call to HCF_ACT_INT_OFF.
- *   Note 2: it has been observed that under certain H/W & S/W architectures this logic is called when there is
- *   no NIC at all. To cater for this, the value of HREG_INT_EN is validated. If the unused bit 0x0100 is set,
- *   it is assumed there is no NIC.
- *   Note 3: During the download process, some versions of the F/W reset HREG_SW_0, hence checking this
- *   register for HCF_MAGIC (the classical NIC presence test) when HCF_ACT_INT_OFF is called due to another
- *   card interrupting via a shared IRQ during a download, fails.
- *4: The construction "if ( ifbp->IFB_IntOffCnt-- == 0 )" is optimal (in the sense of shortest/quickest
- *   path in error free flows) but NOT fail safe in case of too many INT_ON invocations compared to INT_OFF).
- *   Enabling of the interrupts is achieved by writing the Hermes IntEn register.
- *    - If the HCF is in Defunct mode, the interrupts stay disabled.
- *    - Under "normal" conditions, the HCF is only interested in Info Events, Rx Events and Notify Events.
- *    - When the HCF is out of Tx/Notify resources, the HCF is also interested in Alloc Events.
- *    - via HCF_EXT, the MSF programmer can also request HREG_EV_TICK and/or HREG_EV_TX_EXC interrupts.
- *   For DMA operation, the DMA hardware handles the alloc events. The DMA engine will generate a 'TxDmaDone'
- *   event as soon as it has pumped a frame from host ram into NIC-RAM (note that the frame does not have to be
- *   transmitted then), and a 'RxDmaDone' event as soon as a received frame has been pumped from NIC-RAM into
- *   host ram.  Note that the 'alloc' event has been removed from the event-mask, because the DMA engine will
- *   react to and acknowledge this event.
- *6: ack the "old" Rx-event. See "Rx Buffer free strategy" in hcf_service_nic above for more explanation.
- *   IFB_RxFID and IFB_RxLen must be cleared to bring both the internal HCF house keeping and the information
- *   supplied to the MSF in the state "no frame received".
- *8: The HCF_ACT_SCAN, HCF_ACT_PRS_SCAN and HCF_ACT_TALLIES activity are merged by "clever" algebraic
- *   manipulations of the RID-values and action codes, so foregoing robustness against migration problems for
- *   ease of implementation. The assumptions about numerical relationships between CFG_TALLIES etc and
- *   HCF_ACT_TALLIES etc are checked by the "#if" statements just prior to the body of this routine, resulting
- *   in: err "maintenance" during compilation if the assumptions are no longer met. The writing of HREG_PARAM_1
- *   with 0x3FFF in case of an PRS scan, is a kludge to get around lack of specification, hence different
- *   implementation in F/W and Host.
- *   When there is no NIC RAM available, some versions of the Hermes F/W do report 0x7F00 as error in the
- *   Result field of the Status register and some F/W versions don't. To mask this difference to the MSF all
- *   return codes of the Hermes are ignored ("best" and "most simple" solution to these types of analomies with
- *   an acceptable loss due to ignoring all error situations as well).
- *   The "No inquire space" is reported via the Hermes tallies.
- *30: do not HCFASSERT( rc, rc ) since rc == HCF_INT_PENDING is no error
- *
- *.ENDDOC                END DOCUMENTATION
- *
- ************************************************************************************************************/
+/*                                                                                                           
+  
+                                                           
+                                                    
+                                                
+  
+            
+                                                           
+                                                                  
+                                                                       
+                                                                        
+                                                                                                         
+                                                                     
+                                                                   
+                                                                               
+                                              
+                                                                  
+  
+          
+                                                    
+                                                               
+                                                                      
+  
+             
+                                                                                                             
+                                                                                                          
+                                
+                                                                                                          
+              
+  
+              
+                                                                                      
+                                                
+  
+                                                                      
+                        
+                      
+                    
+                     
+                       
+  
+                                                        
+                                                                                                               
+                                            
+  
+                                                      
+                                                                                           
+  
+                                                             
+                                                                                                        
+  
+                                                         
+                                  
+                                                                              
+                                                                                                           
+                                                     
+                                                                                         
+                                                                                                            
+                                
+  
+                                                                                                
+                                                                                     
+                                                                                                     
+  
+                                                                                                              
+                                                                                                  
+  
+                                                                
+                                                                                                             
+                                                                                                               
+                                                                                                           
+                                                                                                               
+                                                                                                             
+                          
+  
+                                                   
+  
+                                                                          
+                                                                                            
+                                             
+                                                                                                              
+                                                                                                           
+                                          
+                                                                                  
+                                                                                                             
+                                                                              
+                                                                                                             
+                                                    
+                                                                                           
+  
+                                             
+                                                          
+                                                                                      
+                                                       
+  
+                                                         
+                                                          
+                                                         
+                                                                                           
+  
+                                       
+                                                                                                          
+                                                   
+                                                                                           
+  
+                  
+                                                
+                                                                        
+                                                      
+                                                                    
+                                                                                                              
+                    
+  
+                                                                                                             
+                                                                                                  
+  
+          
+                                                                                                               
+                                                                                                            
+                                                                                                               
+                                                                                                        
+                                                                                                           
+                                                                                                               
+                                                                                                            
+                                                                                                           
+                                                                                                              
+                                                                                                          
+                                                          
+                                                                                                           
+                                                                                                           
+                                            
+                                                                                                               
+                                                                                                              
+                                   
+                                                                                                       
+                                                                                                           
+                                                                 
+                                                                                                       
+                                                                                                             
+                                                                                 
+                                                                    
+                                                                                                          
+                                                                                               
+                                                                                                       
+                                                                                                             
+                                                                                                               
+                                                                                                             
+                                                                                                             
+                                         
+                                                                                                         
+                                                                                                             
+                                                          
+                                                                                                     
+                                                                                                             
+                                                                                                      
+                                                                                                              
+                                                                                                               
+                                                                                                         
+                                    
+                                                                                                         
+                                                                                                            
+                                                                                                               
+                                                                      
+                                                               
+                                                                        
+  
+                                          
+  
+                                                                                                            */
 #if ( (HCF_TYPE) & HCF_TYPE_HII5 ) == 0
 #if CFG_SCAN != CFG_TALLIES - HCF_ACT_TALLIES + HCF_ACT_SCAN
 err: "maintenance" apparently inviolated the underlying assumption about the numerical values of these macros

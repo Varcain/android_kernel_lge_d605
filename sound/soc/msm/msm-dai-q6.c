@@ -56,6 +56,13 @@ static struct clk *pcm_clk;
 static struct clk *sec_pcm_clk;
 static DEFINE_MUTEX(aux_pcm_mutex);
 static int aux_pcm_count;
+/*                                          
+                                                                                
+                                   
+*/
+static int aux_tx;
+static int aux_rx;
+/*              */
 static struct msm_dai_auxpcm_pdata *auxpcm_plat_data;
 static struct msm_dai_auxpcm_pdata *sec_auxpcm_plat_data;
 
@@ -521,7 +528,8 @@ static int msm_dai_q6_slim_bus_hw_params(struct snd_pcm_hw_params *params,
 	dai_data->port_config.slim_sch.num_channels = dai_data->channels;
 	dai_data->port_config.slim_sch.reserved = 0;
 
-	dev_dbg(dai->dev, "%s:slimbus_dev_id[%hu] bit_wd[%hu] format[%hu]\n"
+    //                                   
+	printk("%s:slimbus_dev_id[%hu] bit_wd[%hu] format[%hu]\n"
 		"num_channel %hu  slave_ch_mapping[0]  %hu\n"
 		"slave_port_mapping[1]  %hu slave_port_mapping[2]  %hu\n"
 		"slave_port_mapping[3]  %hu\n sample_rate %d\n", __func__,
@@ -723,6 +731,25 @@ static void msm_dai_q6_auxpcm_shutdown(struct snd_pcm_substream *substream,
 
 	mutex_lock(&aux_pcm_mutex);
 
+	/*                                          
+                                                                                 
+                                    
+ */
+	if (dai->id == PCM_RX)
+		aux_rx--;
+	else if (dai->id == PCM_TX)
+		aux_tx--;
+
+	if (aux_rx < 0) {
+		aux_rx = 0;
+		mutex_unlock(&aux_pcm_mutex);
+		return;
+	} else if (aux_tx < 0) {
+		aux_tx = 0;
+		mutex_unlock(&aux_pcm_mutex);
+		return;
+	}
+	/*              */
 	if (aux_pcm_count == 0) {
 		dev_dbg(dai->dev, "%s(): dai->id %d aux_pcm_count is 0. Just"
 				" return\n", __func__, dai->id);
@@ -758,6 +785,13 @@ static void msm_dai_q6_auxpcm_shutdown(struct snd_pcm_substream *substream,
 	if (IS_ERR_VALUE(rc))
 		dev_err(dai->dev, "fail to close AUX PCM TX port\n");
 
+	/*                                          
+                                                                                 
+                                    
+ */
+	aux_rx = 0;
+	aux_tx = 0;
+	/*              */
 	mutex_unlock(&aux_pcm_mutex);
 }
 
@@ -844,6 +878,16 @@ static int msm_dai_q6_auxpcm_prepare(struct snd_pcm_substream *substream,
 	unsigned long pcm_clk_rate;
 
 	mutex_lock(&aux_pcm_mutex);
+
+	/*                                          
+                                                                                 
+                                    
+ */
+	if (dai->id == PCM_RX)
+		aux_rx++;
+	else if (dai->id == PCM_TX)
+		aux_tx++;
+	/*              */
 
 	if (aux_pcm_count == 2) {
 		dev_dbg(dai->dev, "%s(): dai->id %d aux_pcm_count is 2. Just"
@@ -1398,7 +1442,8 @@ static int msm_dai_q6_set_channel_map(struct snd_soc_dai *dai,
 	struct msm_dai_q6_dai_data *dai_data = dev_get_drvdata(dai->dev);
 	unsigned int i = 0;
 
-	dev_dbg(dai->dev, "%s: dai_id = %d\n", __func__, dai->id);
+    //                                   
+	printk("%s: dai_id = %d\n", __func__, dai->id);
 	switch (dai->id) {
 	case SLIMBUS_0_RX:
 	case SLIMBUS_1_RX:
@@ -1415,12 +1460,14 @@ static int msm_dai_q6_set_channel_map(struct snd_soc_dai *dai,
 		for (i = 0; i < rx_num; i++) {
 			dai_data->port_config.slim_sch.slave_ch_mapping[i] =
 							rx_slot[i];
-			pr_debug("%s: find number of channels[%d] ch[%d]\n",
+    //                                   
+			printk("%s: find number of channels[%d] ch[%d]\n",
 							__func__, i,
 							rx_slot[i]);
 		}
 		dai_data->port_config.slim_sch.num_channels = rx_num;
-		pr_debug("%s:SLIMBUS_%d_RX cnt[%d] ch[%d %d]\n", __func__,
+    //                                   
+		printk("%s:SLIMBUS_%d_RX cnt[%d] ch[%d %d]\n", __func__,
 				(dai->id - SLIMBUS_0_RX) / 2,
 		rx_num, dai_data->port_config.slim_sch.slave_ch_mapping[0],
 		dai_data->port_config.slim_sch.slave_ch_mapping[1]);
@@ -1441,11 +1488,13 @@ static int msm_dai_q6_set_channel_map(struct snd_soc_dai *dai,
 		for (i = 0; i < tx_num; i++) {
 			dai_data->port_config.slim_sch.slave_ch_mapping[i] =
 							tx_slot[i];
-			pr_debug("%s: find number of channels[%d] ch[%d]\n",
+    //                                   
+			printk("%s: find number of channels[%d] ch[%d]\n",
 						__func__, i, tx_slot[i]);
 		}
 		dai_data->port_config.slim_sch.num_channels = tx_num;
-		pr_debug("%s:SLIMBUS_%d_TX cnt[%d] ch[%d %d]\n", __func__,
+    //                                   
+		printk("%s:SLIMBUS_%d_TX cnt[%d] ch[%d %d]\n", __func__,
 			(dai->id - SLIMBUS_0_TX) / 2,
 		tx_num, dai_data->port_config.slim_sch.slave_ch_mapping[0],
 		dai_data->port_config.slim_sch.slave_ch_mapping[1]);

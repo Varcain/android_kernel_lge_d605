@@ -858,4 +858,11 @@ asmlinkage long sys_process_vm_writev(pid_t pid,
 				      unsigned long riovcnt,
 				      unsigned long flags);
 
+//FEATURE_SDCARD_MEDIAEXN_SYSTEMCALL_ENCRYPTION[S]
+asmlinkage long sys_set_media_property(int value);
+asmlinkage long sys_set_media_ext(char *mediaExtList);
+//FEATURE_SDCARD_MEDIAEXN_SYSTEMCALL_ENCRYPTION[E]
+//LG_FW_USER_DATA_BACKUP
+asmlinkage long sys_LGE_Dload_SRD (void *req_pkt_ptr, void *rsp_pkt_ptr);
+asmlinkage long sys_test (int* temp);
 #endif

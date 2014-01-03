@@ -427,4 +427,13 @@ config REGULATOR_QPNP
 	  comply with QPNP.  QPNP is a SPMI based PMIC implementation.  These
 	  chips provide several different varieties of LDO and switching
 	  regulators.  They also provide voltage switches and boost regulators.
+
+# LGE_CHANGE_S [koh.euije@lge.com] LCD for L9II REV
+config LCD_BIAS_TPS65132
+	tristate "TI TPS65132 LCD Display Bias"
+	depends on I2C
+	help
+	  This driver supports TPS65132 LCD Display Bias chips. For LCD power VEE/VDD +-5V 
+# LGE_CHANGE_E [koh.euije@lge.com] LCD for L9II REV
+	  
 endif

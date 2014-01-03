@@ -19,7 +19,15 @@
 #include <linux/mutex.h>
 #include <linux/clk.h>
 #include <linux/clkdev.h>
-
+/*           
+                                            
+                                                                     
+                            
+ */
+#ifdef CONFIG_DEBUG_FS
+#include <linux/debugfs.h>
+#include <linux/seq_file.h>
+#endif
 static LIST_HEAD(clocks);
 static DEFINE_MUTEX(clocks_mutex);
 
@@ -198,3 +206,46 @@ void clkdev_drop(struct clk_lookup *cl)
 	kfree(cl);
 }
 EXPORT_SYMBOL(clkdev_drop);
+
+
+#ifdef CONFIG_DEBUG_FS
+/*           
+                                            
+                                                                     
+                            
+ */
+static int clkdev_clk_show(struct seq_file *s, void *unused)
+{
+	struct clk_lookup *p;
+
+	seq_printf(s, "%-20s %-20s rate\n", "dev_id", "con_id");
+
+	list_for_each_entry(p, &clocks, node) {
+		seq_printf(s, "%-20s %-20s %9ld Hz\n",
+				   p->dev_id, p->con_id, clk_get_rate(p->clk));
+	}
+	return 0;
+}
+
+static int clkdev_clk_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, clkdev_clk_show, NULL);
+}
+
+static const struct file_operations clkdev_clk_operations = {
+	.open		= clkdev_clk_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static int __init clkdev_clk_debugfs_init(void)
+{
+	/* /sys/kernel/debug/clkdev */
+	(void) debugfs_create_file("clkdev", S_IFREG | S_IRUGO, NULL, NULL,
+							   &clkdev_clk_operations);
+	return 0;
+}
+
+postcore_initcall(clkdev_clk_debugfs_init);
+#endif

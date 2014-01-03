@@ -208,6 +208,8 @@ static int soc_pcm_open(struct snd_pcm_substream *substream)
 	struct snd_soc_dai_driver *codec_dai_drv = codec_dai->driver;
 	int ret = 0;
 
+	/*            */
+	printk("%s - %s \n",__func__,rtd->dai_link->name);
 	pm_runtime_get_sync(cpu_dai->dev);
 	pm_runtime_get_sync(codec_dai->dev);
 	pm_runtime_get_sync(platform->dev);
@@ -441,6 +443,9 @@ static int soc_pcm_close(struct snd_pcm_substream *substream)
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
 	struct snd_soc_codec *codec = rtd->codec;
+    
+	/*            */
+	printk("%s - %s \n",__func__,rtd->dai_link->name);
 
 	mutex_lock_nested(&rtd->pcm_mutex, rtd->pcm_subclass);
 
@@ -857,7 +862,8 @@ static inline int be_connect(struct snd_soc_pcm_runtime *fe,
 	list_add(&dpcm_params->list_be, &fe->dpcm[stream].be_clients);
 	list_add(&dpcm_params->list_fe, &be->dpcm[stream].fe_clients);
 
-	dev_dbg(fe->dev, "  connected new DSP %s path %s %s %s\n",
+	/*                        */
+	printk("  connected new DSP %s path %s %s %s\n",
 			stream ? "capture" : "playback",  fe->dai_link->name,
 			stream ? "<-" : "->", be->dai_link->name);
 

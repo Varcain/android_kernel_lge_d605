@@ -72,16 +72,16 @@ u16 QMUXHeaderSize( void )
    return sizeof( sQMUX );
 }
 
-/*===========================================================================
-METHOD:
-   QMICTLGetClientIDReqSize (Public Method)
+/*                                                                           
+       
+                                           
 
-DESCRIPTION:
-   Get size of buffer needed for QMUX + QMICTLGetClientIDReq
+            
+                                                            
  
-RETURN VALUE:
-   u16 - size of buffer
-===========================================================================*/
+             
+                       
+                                                                           */
 u16 QMICTLGetClientIDReqSize( void )
 {
    return sizeof( sQMUX ) + 10;
@@ -399,23 +399,23 @@ int GetQMIMessageID(
 // Fill Buffers with QMI requests
 /*=========================================================================*/
 
-/*===========================================================================
-METHOD:
-   QMICTLGetClientIDReq (Public Method)
+/*                                                                           
+       
+                                       
 
-DESCRIPTION:
-   Fill buffer with QMI CTL Get Client ID Request
+            
+                                                 
 
-PARAMETERS
-   pBuffer         [ 0 ] - Buffer to be filled
-   buffSize        [ I ] - Size of pBuffer
-   transactionID   [ I ] - Transaction ID
-   serviceType     [ I ] - Service type requested
+          
+                                              
+                                          
+                                         
+                                                 
 
-RETURN VALUE:
-   int - Positive for resulting size of pBuffer
-         Negative errno for error
-===========================================================================*/
+             
+                                               
+                                 
+                                                                           */
 int QMICTLGetClientIDReq(
    void *   pBuffer,
    u16      buffSize,
@@ -667,22 +667,22 @@ int QMIDMSGetMEIDReq(
 // Parse data from QMI responses
 /*=========================================================================*/
 
-/*===========================================================================
-METHOD:
-   QMICTLGetClientIDResp (Public Method)
+/*                                                                           
+       
+                                        
 
-DESCRIPTION:
-   Parse the QMI CTL Get Client ID Resp
+            
+                                       
 
-PARAMETERS
-   pBuffer         [ I ] - Buffer to be parsed
-   buffSize        [ I ] - Size of pBuffer
-   pClientID       [ 0 ] - Recieved client ID
+          
+                                              
+                                          
+                                             
 
-RETURN VALUE:
-   int - 0 for success
-         Negative errno for error
-===========================================================================*/
+             
+                      
+                                 
+                                                                           */
 int QMICTLGetClientIDResp(
    void * pBuffer,
    u16    buffSize,

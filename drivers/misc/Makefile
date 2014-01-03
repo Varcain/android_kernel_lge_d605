@@ -66,8 +66,18 @@ obj-$(CONFIG_PMIC8058_PWM) += pmic8058-pwm.o
 obj-$(CONFIG_PMIC8XXX_VIBRATOR) += pm8xxx-vibrator.o
 obj-$(CONFIG_PMIC8XXX_NFC) += pm8xxx-nfc.o
 obj-$(CONFIG_PMIC8XXX_UPL) += pm8xxx-upl.o
+# LGE_CHANGE
+obj-$(CONFIG_LGE_DIRECT_QCOIN_VIBRATOR) += pm8xxx-qcoin.o
+obj-$(CONFIG_ANDROID_SW_IRRC)	+= android_irrc.o
+# LGE_CHANGE_S [younglae.kim@lge.com] 2013-02-25, add immersion solution
+obj-y += tspdrv/
+# LGE_CHANGE_E [younglae.kim@lge.com] 2013-02-25
 obj-$(CONFIG_MSM_MEMORY_LOW_POWER_MODE_SUSPEND_DEEP_POWER_DOWN) \
 	+= msm_migrate_pages.o
 obj-$(CONFIG_PMIC8058_XOADC) += pmic8058-xoadc.o
 obj-$(CONFIG_QSEECOM) += qseecom.o
+obj-$(CONFIG_BU52031NVX) += pm8xxx-cradle.o
 obj-$(CONFIG_QFP_FUSE) += qfp_fuse.o
+## LGE_CHANGE_S gspapa@lge.com 2013.03.11 uart port setting for L9II IRRC
+obj-$(CONFIG_LGE_IRRC)			+= lge_uei_irrc.o
+## LGE_CHANGE_E gspapa@lge.com 2013.03.11 uart port setting for L9II IRRC

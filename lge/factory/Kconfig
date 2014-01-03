@@ -1,0 +1,28 @@
+#platform.team@lge.com	2011.01
+
+config LGE_FACTORY
+	default y
+	bool "LGE factory Configuration"
+	help
+		LGE factory Configuration
+
+config LGE_DIAGTEST
+	depends on LGE_FACTORY
+	default y
+	bool "LGE TestMode Diag Support"
+	help
+		LGE TestMode Diag Supports
+
+config LGE_DLOAD_SRD
+	depends on LGE_FACTORY
+	default y
+	bool "LGE Dload SelfRecoveryDownload Support"
+	help
+		LGE Dload SelfRecoveryDownload Support
+
+config LGE_EMMC_DIRECT_ACCESS
+	depends on LGE_DIAGTEST
+	default y
+	bool "LGE eMMC direct access driver"
+	help
+                LGE eMMC direct access driver

@@ -514,15 +514,15 @@ static int gpmi_nfc_compute_hardware_timing(struct gpmi_nand_data *this,
 	}
 
 	/*
-	 * When control arrives here, the eye is open. The ideal time to sample
-	 * the data is in the center of the eye:
-	 *
-	 *     end of the eye + start of the eye
-	 *     ---------------------------------  -  data_setup
-	 *                    2
-	 *
-	 * After some algebra, this simplifies to the code immediately below.
-	 */
+                                                                        
+                                         
+   
+                                         
+                                                        
+                        
+   
+                                                                      
+  */
 	ideal_sample_delay_in_ns =
 		((int)max_prop_delay_in_ns +
 			(int)target.tREA_in_ns +

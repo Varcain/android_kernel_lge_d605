@@ -622,11 +622,11 @@ static int sstfb_set_par(struct fb_info *info)
 	}
 
 #if defined(__BIG_ENDIAN)
-	/* Enable byte-swizzle functionality in hardware.
-	 * With this enabled, all our read- and write-accesses to
-	 * the voodoo framebuffer can be done in native format, and
-	 * the hardware will automatically convert it to little-endian.
-	 * - tested on HP-PARISC, Helge Deller <deller@gmx.de> */
+	/*                                               
+                                                          
+                                                            
+                                                                
+                                                        */
 	lfbmode |= ( LFB_WORD_SWIZZLE_WR | LFB_BYTE_SWIZZLE_WR |
 		     LFB_WORD_SWIZZLE_RD | LFB_BYTE_SWIZZLE_RD );
 #endif

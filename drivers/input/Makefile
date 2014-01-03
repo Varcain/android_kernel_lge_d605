@@ -22,7 +22,15 @@ obj-$(CONFIG_INPUT_JOYSTICK)	+= joystick/
 obj-$(CONFIG_INPUT_TABLET)	+= tablet/
 obj-$(CONFIG_INPUT_TOUCHSCREEN)	+= touchscreen/
 obj-$(CONFIG_INPUT_MISC)	+= misc/
+# LGE_CHANGE
+obj-$(CONFIG_INPUT_SENSOR)	+= sensor/
 
 obj-$(CONFIG_INPUT_APMPOWER)	+= apm-power.o
 obj-$(CONFIG_INPUT_OF_MATRIX_KEYMAP) += of_keymap.o
 obj-$(CONFIG_INPUT_KEYRESET)	+= keyreset.o
+
+# LGE_CHANGE
+#+++ BRCM : FX3_BT_bringup - kukdong.bae@lge.com [S]
+obj-y	+= bthid/
+#--- BRCM : FX3_BT_bringup - kukdong.bae@lge.com [E]
+

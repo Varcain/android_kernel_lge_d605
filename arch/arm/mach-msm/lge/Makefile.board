@@ -1,0 +1,9 @@
+#
+# Makefile for the LGE board
+#
+
+# lgps9
+obj-$(CONFIG_MACH_MSM8930_LGPS9) += lgps9/
+# fx3
+obj-$(CONFIG_MACH_MSM8930_FX3) += fx3/
+

@@ -30,17 +30,13 @@ struct pm8xxx_bms_core_data {
 /**
  * struct pm8921_bms_platform_data -
  * @batt_type:		allows to force chose battery calibration data
- * @r_sense_uohm:	sense resistor value in (micro Ohms)
+ * @r_sense:		sense resistor value in (mOhms)
  * @i_test:		current at which the unusable charger cutoff is to be
  *			calculated or the peak system current (mA)
  * @v_cutoff:		the loaded voltage at which the battery
  *			is considered empty(mV)
  * @enable_fcc_learning:	if set the driver will learn full charge
  *				capacity of the battery upon end of charge
- * @normal_voltage_calc_ms:	The period of soc calculation in ms when battery
- *				voltage higher than cutoff voltage
- * @low_voltage_calc_ms:	The period of soc calculation in ms when battery
- *				voltage is near cutoff voltage
  */
 struct pm8921_bms_platform_data {
 	struct pm8xxx_bms_core_data	bms_cdata;
@@ -60,6 +56,13 @@ struct pm8921_bms_platform_data {
 };
 
 #if defined(CONFIG_PM8921_BMS) || defined(CONFIG_PM8921_BMS_MODULE)
+
+/* 2012-04-28 Lx-battery-informaion
+L0 4.3V LGC_BL44JH_1700_data
+L0 4.2V LGC_BL44JS_1700_data
+L1 4.3V LGC_BL53QH_2000_data
+*/
+
 /**
  * pm8921_bms_get_vsense_avg - return the voltage across the sense
  *				resitor in microvolts

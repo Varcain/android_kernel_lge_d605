@@ -278,7 +278,14 @@ static int msm_isp_notify_vfe(struct msm_cam_media_controller *pmctl,
 	struct v4l2_subdev *sd,	unsigned int notification,  void *arg)
 {
 	int rc = 0;
+//                                                                                                                                        
+#if 0 // prevent stack-overflow	
 	struct v4l2_event v4l2_evt;
+#else
+	#define	v4l2_evt (*_v4l2_evt)
+	struct v4l2_event *_v4l2_evt;
+#endif
+//                                                                                                                                    
 	struct msm_isp_event_ctrl *isp_event;
 	struct msm_free_buf buf;
 
@@ -300,6 +307,16 @@ static int msm_isp_notify_vfe(struct msm_cam_media_controller *pmctl,
 		return -ENOMEM;
 	}
 
+//                                                                                                                                       
+#if 1 // prevent stack-overflow
+	_v4l2_evt = kmalloc( sizeof(struct v4l2_event), GFP_ATOMIC);
+	if (!_v4l2_evt) {
+		pr_err("%s failed: Insufficient memory. return", __func__);
+		kfree( isp_event);
+		return -ENOMEM;
+	}
+#endif
+//                                                                                                                                    
 	v4l2_evt.type = V4L2_EVENT_PRIVATE_START +
 					MSM_CAM_RESP_STAT_EVT_MSG;
 	v4l2_evt.id = 0;
@@ -487,6 +504,12 @@ static int msm_isp_notify_vfe(struct msm_cam_media_controller *pmctl,
 	v4l2_event_queue(pmctl->config_device->config_stat_event_queue.pvdev,
 			 &v4l2_evt);
 
+//                                                                                                                                       
+#if 1 // prevent stack-overflow
+	kfree(_v4l2_evt);
+	#undef v4l2_evt
+#endif
+//                                                                                                                                    
 	return rc;
 }
 

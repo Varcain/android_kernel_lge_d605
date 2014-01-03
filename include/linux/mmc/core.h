@@ -96,7 +96,11 @@ struct mmc_command {
  */
 
 	unsigned int		cmd_timeout_ms;	/* in milliseconds */
-
+/*            */
+/* Set this flag only for blocking bkops request */
+#ifndef BKOPS_UPDATE    
+	bool			bkops_busy;
+#endif
 	struct mmc_data		*data;		/* data segment associated with cmd */
 	struct mmc_request	*mrq;		/* associated request */
 };
@@ -152,7 +156,14 @@ extern void mmc_start_bkops(struct mmc_card *card, bool from_exception);
 extern void mmc_start_delayed_bkops(struct mmc_card *card);
 extern void mmc_start_idle_time_bkops(struct work_struct *work);
 extern void mmc_bkops_completion_polling(struct work_struct *work);
+/*            */
+#ifndef BKOPS_UPDATE
+extern int __mmc_switch(struct mmc_card *, u8, u8, u8, unsigned int, bool,
+			bool);
+#else
 extern int __mmc_switch(struct mmc_card *, u8, u8, u8, unsigned int, bool);
+#endif
+
 extern int mmc_switch(struct mmc_card *, u8, u8, u8, unsigned int);
 extern int mmc_send_ext_csd(struct mmc_card *card, u8 *ext_csd);
 
@@ -195,7 +206,10 @@ extern int mmc_flush_cache(struct mmc_card *);
 extern int mmc_flush_cache(struct mmc_card *);
 
 extern int mmc_detect_card_removed(struct mmc_host *host);
-
+/*            */
+#ifndef BKOPS_UPDATE
+extern void mmc_blk_init_bkops_statistics(struct mmc_card *card);
+#endif
 /**
  *	mmc_claim_host - exclusively claim a host
  *	@host: mmc host to claim

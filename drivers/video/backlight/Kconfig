@@ -361,6 +361,14 @@ config BACKLIGHT_PANDORA
 	  If you have a Pandora console, say Y to enable the
 	  backlight driver.
 
+#LGE_CHANGE_S [koh.euije@lge.com] Backlight for L9II REV
+config BACKLIGHT_LM3639
+	tristate "Backlight Driver for LM3639"
+	depends on BACKLIGHT_CLASS_DEVICE && I2C
+	help
+	  This supports TI LM3639 Backlight + 1.5A Flash LED Driver
+#LGE_CHANGE_E [koh.euije@lge.com] Backlight for L9II REV
+
 endif # BACKLIGHT_CLASS_DEVICE
 
 endif # BACKLIGHT_LCD_SUPPORT

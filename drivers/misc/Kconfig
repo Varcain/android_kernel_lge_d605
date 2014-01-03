@@ -603,6 +603,75 @@ config PMIC8XXX_VIBRATOR
 	  on the PM8XXX chips. The vibrator is controlled using the
 	  timed output class.
 
+# LGE_CHANGE
+config LGE_PMIC8XXX_VIBRATOR_VOL
+	bool "Control the strength of Qualcomm Vibrator"
+	depends on PMIC8XXX_VIBRATOR
+	default n
+	help
+	  This option enables the control of vibration strength for the vibrator
+	  on the PM8XXX chips. The vibrator volume is controlled using the
+	  timed output class.
+
+# LGE_CHANGE
+config LGE_PMIC8XXX_VIBRATOR_MIN_TIMEOUT
+	bool "Minimum timeout ms of Qualcomm Vibrator"
+	depends on PMIC8XXX_VIBRATOR
+	default n
+	help
+	  This option uses minimum timeout ms of vibrator working.
+	  Maybe, very short timeout ms cause vibrator not working physically.
+	  The min timeout ms guarantee vibrator working for very shor timeout
+	  request.
+
+# LGE_CHANGE
+config LGE_PMIC8XXX_VIBRATOR_OVERDRIVE
+    bool "Over drive(max mV) working for starting vibrator of Qualcomm Vibrator"
+	depends on PMIC8XXX_VIBRATOR
+	default n
+	help
+	  This option uses max mV working for starting vibrator.
+	  It can be felt more strongly vibrator effect for short timeout request.
+
+# LGE_CHANGE
+config LGE_PMIC8XXX_VIBRATOR_REST_POWER
+    bool "Control rest rotation power for more sensitive touch vibrator effect"
+    depends on PMIC8XXX_VIBRATOR
+    default n
+    help
+      This option enable to control rest rotation power for more sensitive touch
+      vibrator effet.
+
+# LGE_CHANGE
+config LGE_DIRECT_QCOIN_VIBRATOR
+    bool "PM8XXX Direct Q-coin vibrator support"
+        depends on ANDROID_TIMED_OUTPUT
+        default n
+        help
+          This option enalbes device driver support for Android Vibrator driver.
+          Some functions should be given by platform data for Motor IC, etc.
+
+# LGE_CHANGE_S [younglae.kim@lge.com] 2013-02-25, add for immersion solution
+config TSPDRV
+    bool "Immersion haptic tspdrv"
+    default y
+    help
+        Immersion haptic driver
+# LGE_CHANGE_E [younglae.kim@lge.com] 2013-02-25
+
+config ANDROID_SW_IRRC
+	bool "Android irrc support"
+	default n
+	help
+	  This option enables device driver support for Android SW IRRC
+	  Some functions should be given by platform data for enable PWM, Motor IC, etc.
+
+config LGE_IRRC
+	bool "LGE IRRC support"
+	default n
+	help
+	  This option enables device driver support for Android HW IRRC
+
 config PMIC8XXX_NFC
 	tristate "Qualcomm PM8XXX support for Near Field Communication"
 	depends on MFD_PM8XXX
@@ -652,6 +721,26 @@ config USB_HSIC_SMSC_HUB
 
 	  This adds support for connecting devices like mouse in HSIC
 	  Host mode.
+
+config BU52031NVX
+	tristate "Cradle BU52031NVX support"
+	depends on MFD_PM8XXX
+	help
+	  This option enables device driver support for the cradle
+	  on the PM8XXX chips. The cradle is controlled using the
+	  PM8XXX gpio.
+
+config BU52031NVX_POUCHDETECT
+	tristate "Cradle BU52031NVX_POUCHDETECT support"
+	depends on BU52031NVX
+	help
+	  This option enables pouch.
+
+config BU52031NVX_CARKITDETECT
+	tristate "Cradle BU52031NVX_CARKITDETECT support"
+	depends on BU52031NVX
+	help
+	  This option enables pouch.
 
 source "drivers/misc/c2port/Kconfig"
 source "drivers/misc/eeprom/Kconfig"

@@ -464,6 +464,10 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 
 	if (card->ext_csd.rev >= 5) {
 		/* check whether the eMMC card supports BKOPS */
+#ifdef CONFIG_LGE_MMC_BKOPS_DISABLE
+// disable BKOPS
+		pr_info("BKOPS unsupport\n");
+#else
 		if (ext_csd[EXT_CSD_BKOPS_SUPPORT] & 0x1) {
 			card->ext_csd.bkops = 1;
 			card->ext_csd.bkops_en = ext_csd[EXT_CSD_BKOPS_EN];
@@ -483,7 +487,7 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 				pr_info("%s: BKOPS_EN bit is not set\n",
 					mmc_hostname(card->host));
 		}
-
+#endif
 		/* check whether the eMMC card supports HPI */
 		if (ext_csd[EXT_CSD_HPI_FEATURES] & 0x1) {
 			card->ext_csd.hpi = 1;
@@ -1331,6 +1335,11 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 			 * a default value is used.
 			 */
 			card->bkops_info.delay_ms = MMC_IDLE_BKOPS_TIME_MS;
+/*            */
+#ifndef BKOPS_UPDATE
+            if (card->bkops_info.host_delay_ms)
+                card->bkops_info.delay_ms = card->bkops_info.host_delay_ms;
+#else
 			if (card->bkops_info.host_suspend_tout_ms)
 				card->bkops_info.delay_ms = min(
 					card->bkops_info.delay_ms,
@@ -1338,6 +1347,7 @@ static int mmc_init_card(struct mmc_host *host, u32 ocr,
 
 			card->bkops_info.min_sectors_to_queue_delayed_work =
 				BKOPS_MIN_SECTORS_TO_QUEUE_DELAYED_WORK;
+#endif
 		}
 	}
 
@@ -1448,11 +1458,14 @@ static int mmc_suspend(struct mmc_host *host)
 	BUG_ON(!host->card);
 
 	mmc_claim_host(host);
-
+/*            */
+#ifndef BKOPS_UPDATE
 	err = mmc_cache_ctrl(host, 0);
 	if (err)
 		goto out;
+#else
 
+#endif
 	if (mmc_can_poweroff_notify(host->card))
 		err = mmc_poweroff_notify(host->card, EXT_CSD_POWER_OFF_SHORT);
 	else if (mmc_card_can_sleep(host))
@@ -1460,8 +1473,12 @@ static int mmc_suspend(struct mmc_host *host)
 	else if (!mmc_host_is_spi(host))
 		mmc_deselect_cards(host);
 	host->card->state &= ~(MMC_STATE_HIGHSPEED | MMC_STATE_HIGHSPEED_200);
-
+/*            */
+#ifndef BKOPS_UPDATE
 out:
+#else
+
+#endif
 	mmc_release_host(host);
 	return err;
 }

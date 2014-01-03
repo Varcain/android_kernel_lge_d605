@@ -264,6 +264,8 @@ config GENERIC_BUG
 	def_bool y
 	depends on BUG
 
+# LGE_CHANGE: for SRD  2012.10
+source "lge/Kconfig"
 source "init/Kconfig"
 
 source "kernel/Kconfig.freezer"
@@ -1785,7 +1787,7 @@ config AEABI
 config OABI_COMPAT
 	bool "Allow old ABI binaries to run with this kernel (EXPERIMENTAL)"
 	depends on AEABI && EXPERIMENTAL && !THUMB2_KERNEL
-	default y
+	default y if !SMP
 	help
 	  This option preserves the old syscall interface along with the
 	  new (ARM EABI) one. It also provides a compatibility layer to

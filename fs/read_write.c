@@ -20,6 +20,18 @@
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
 
+#ifndef CONFIG_MACH_LGE_L9II_COMMON
+/*             
+  
+                                        
+                                             
+  
+                                  
+ */
+#include "sreadahead_prof.h"
+/*             */
+#endif
+
 const struct file_operations generic_ro_fops = {
 	.llseek		= generic_file_llseek,
 	.read		= do_sync_read,
@@ -374,6 +386,19 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 
 	ret = rw_verify_area(READ, file, pos, count);
 	if (ret >= 0) {
+
+#ifndef CONFIG_MACH_LGE_L9II_COMMON
+/*             
+  
+                                        
+                                             
+  
+                                  
+ */
+	sreadahead_prof( file, count, *pos);
+/*              */
+#endif
+
 		count = ret;
 		if (file->f_op->read)
 			ret = file->f_op->read(file, buf, count, pos);
@@ -731,6 +756,18 @@ static ssize_t do_readv_writev(int type, struct file *file,
 	ret = rw_verify_area(type, file, pos, tot_len);
 	if (ret < 0)
 		goto out;
+
+#ifndef CONFIG_MACH_LGE_L9II_COMMON
+/*             
+  
+                                        
+                                             
+  
+                                  
+ */
+	if( type == READ) sreadahead_prof( file, tot_len, *pos);
+/*              */
+#endif
 
 	fnv = NULL;
 	if (type == READ) {

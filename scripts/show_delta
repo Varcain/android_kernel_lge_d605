@@ -42,6 +42,12 @@ starting with "NET4".
 # seconds is returned as a float
 # raise an exception if no timing data was found
 def get_time(line):
+
+	/* LGE_CHANGE */
+	if line[0]=="<":
+		(loglevel_str, rest) = string.split(line[1:],'>',1)
+		line = rest
+
 	if line[0]!="[":
 		raise ValueError
 

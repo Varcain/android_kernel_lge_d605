@@ -18,13 +18,37 @@
 #define FCC_CC_COLS		5
 #define FCC_TEMP_COLS		8
 
+#if defined(CONFIG_MACH_LGE_L9II_COMMON)
+#define PC_CC_ROWS             31 
+
+#else
 #define PC_CC_ROWS             29
+#endif
+
 #define PC_CC_COLS             13
 
+#if defined(CONFIG_MACH_LGE_L9II_COMMON)
+
+#define PC_TEMP_ROWS		31
+
+#else
 #define PC_TEMP_ROWS		29
+#endif
+
 #define PC_TEMP_COLS		8
 
 #define MAX_SINGLE_LUT_COLS	20
+
+#if defined(CONFIG_LGE_PM)
+extern struct bms_battery_data  LGE_BL_58JH_Sanyo_2460mAh_data;
+extern struct bms_battery_data  LGE_BL_58JH_LGE_2460mAh_data;
+
+#if defined(CONFIG_MACH_LGE_L9II_COMMON)
+
+extern struct bms_battery_data  LG_D_BL53QH_2150_data;
+extern struct bms_battery_data  LG_C_BL53QH_2150_data;
+#endif
+#endif
 
 struct single_row_lut {
 	int x[MAX_SINGLE_LUT_COLS];
@@ -105,6 +129,11 @@ struct bms_battery_data {
 	defined(CONFIG_PM8921_BMS_MODULE)
 extern struct bms_battery_data  palladium_1500_data;
 extern struct bms_battery_data  desay_5200_data;
+//                                                                                                                   
+#ifdef CONFIG_MACH_LGE_L9II_COMMON
+extern struct bms_battery_data LGC_BL53QH_2000_data;
+#endif
+//                                                                                                                  
 
 int interpolate_fcc(struct single_row_lut *fcc_temp_lut, int batt_temp);
 int interpolate_scalingfactor(struct sf_lut *sf_lut, int row_entry, int pc);

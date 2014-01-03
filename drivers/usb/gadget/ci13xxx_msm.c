@@ -20,6 +20,10 @@
 
 #include "ci13xxx_udc.c"
 
+#ifdef CONFIG_USB_G_LGE_ANDROID
+#include <linux/wakelock.h>
+#endif
+
 #define MSM_USB_BASE	(udc->regs)
 
 struct ci13xxx_udc_context {
@@ -28,9 +32,15 @@ struct ci13xxx_udc_context {
 	int wake_gpio;
 	int wake_irq;
 	bool wake_irq_state;
+#ifdef CONFIG_USB_G_LGE_ANDROID
+    struct wake_lock wlock;
+#endif
 };
 
 static struct ci13xxx_udc_context _udc_ctxt;
+
+#ifdef CONFIG_USB_G_LGE_ANDROID
+#endif
 
 static irqreturn_t msm_udc_irq(int irq, void *data)
 {
@@ -61,19 +71,39 @@ static void ci13xxx_msm_resume(void)
 	}
 }
 
+static const char *pm8038_irg_string(int e)
+{
+	switch (e) {
+	case CI13XXX_CONTROLLER_RESET_EVENT:		return "RESET";
+	case CI13XXX_CONTROLLER_CONNECT_EVENT:		return "CONNECT";
+	case CI13XXX_CONTROLLER_SUSPEND_EVENT:		return "SUSPEND";
+	case CI13XXX_CONTROLLER_REMOTE_WAKEUP_EVENT:return "REMOTE_WAKEUP";
+	case CI13XXX_CONTROLLER_RESUME_EVENT:		return "RESUME";
+	case CI13XXX_CONTROLLER_DISCONNECT_EVENT:	return "DISCONNECT";
+	default:									return "UNDEFINED";
+	}
+}
+
 static void ci13xxx_msm_notify_event(struct ci13xxx *udc, unsigned event)
 {
 	struct device *dev = udc->gadget.dev.parent;
+	printk("[USB : %s : %d] %s\n", __func__, __LINE__, pm8038_irg_string(event));
 
 	switch (event) {
 	case CI13XXX_CONTROLLER_RESET_EVENT:
 		dev_info(dev, "CI13XXX_CONTROLLER_RESET_EVENT received\n");
 		writel(0, USB_AHBBURST);
 		writel_relaxed(0x08, USB_AHBMODE);
+#ifdef CONFIG_USB_G_LGE_ANDROID
+        wake_lock(&_udc_ctxt.wlock);
+#endif
 		break;
 	case CI13XXX_CONTROLLER_DISCONNECT_EVENT:
 		dev_info(dev, "CI13XXX_CONTROLLER_DISCONNECT_EVENT received\n");
 		ci13xxx_msm_resume();
+#ifdef CONFIG_USB_G_LGE_ANDROID
+		wake_unlock(&_udc_ctxt.wlock);
+#endif
 		break;
 	case CI13XXX_CONTROLLER_SUSPEND_EVENT:
 		dev_info(dev, "CI13XXX_CONTROLLER_SUSPEND_EVENT received\n");
@@ -90,6 +120,7 @@ static void ci13xxx_msm_notify_event(struct ci13xxx *udc, unsigned event)
 	}
 }
 
+//	#ifdef CONFIG_USB_OTG
 static irqreturn_t ci13xxx_msm_resume_irq(int irq, void *data)
 {
 	struct ci13xxx *udc = _udc;
@@ -101,6 +132,7 @@ static irqreturn_t ci13xxx_msm_resume_irq(int irq, void *data)
 
 	return IRQ_HANDLED;
 }
+//	#endif
 
 static struct ci13xxx_udc_driver ci13xxx_msm_udc_driver = {
 	.name			= "ci13xxx_msm",
@@ -108,12 +140,17 @@ static struct ci13xxx_udc_driver ci13xxx_msm_udc_driver = {
 				  CI13XXX_REQUIRE_TRANSCEIVER |
 				  CI13XXX_PULLUP_ON_VBUS |
 				  CI13XXX_ZERO_ITC |
+#ifdef CONFIG_USB_OTG
 				  CI13XXX_DISABLE_STREAMING |
 				  CI13XXX_IS_OTG,
+#else
+				  CI13XXX_DISABLE_STREAMING,
+#endif
 
 	.notify_event		= ci13xxx_msm_notify_event,
 };
 
+//	#ifdef CONFIG_USB_OTG // HOST mode
 static int ci13xxx_msm_install_wake_gpio(struct platform_device *pdev,
 				struct resource *res)
 {
@@ -123,6 +160,7 @@ static int ci13xxx_msm_install_wake_gpio(struct platform_device *pdev,
 	dev_dbg(&pdev->dev, "ci13xxx_msm_install_wake_gpio\n");
 
 	_udc_ctxt.wake_gpio = res->start;
+//	printk("[USB : %s : %d] GPIO=%d\n", __func__, __LINE__, _udc_ctxt.wake_gpio);
 	gpio_request(_udc_ctxt.wake_gpio, "USB_RESUME");
 	gpio_direction_input(_udc_ctxt.wake_gpio);
 	wake_irq = gpio_to_irq(_udc_ctxt.wake_gpio);
@@ -149,15 +187,17 @@ gpio_free:
 	_udc_ctxt.wake_gpio = 0;
 	return ret;
 }
+//	#endif
 
 static void ci13xxx_msm_uninstall_wake_gpio(struct platform_device *pdev)
 {
 	dev_dbg(&pdev->dev, "ci13xxx_msm_uninstall_wake_gpio\n");
-
+//	#ifdef CONFIG_USB_OTG
 	if (_udc_ctxt.wake_gpio) {
 		gpio_free(_udc_ctxt.wake_gpio);
 		_udc_ctxt.wake_gpio = 0;
 	}
+//	#endif
 }
 
 static int ci13xxx_msm_probe(struct platform_device *pdev)
@@ -192,6 +232,7 @@ static int ci13xxx_msm_probe(struct platform_device *pdev)
 		goto udc_remove;
 	}
 
+//	#ifdef CONFIG_USB_OTG // HOST mode
 	res = platform_get_resource_byname(pdev, IORESOURCE_IO, "USB_RESUME");
 	if (res) {
 		ret = ci13xxx_msm_install_wake_gpio(pdev, res);
@@ -200,6 +241,7 @@ static int ci13xxx_msm_probe(struct platform_device *pdev)
 			goto udc_remove;
 		}
 	}
+//	#endif
 
 	ret = request_irq(_udc_ctxt.irq, msm_udc_irq, IRQF_SHARED, pdev->name,
 					  pdev);
@@ -208,6 +250,9 @@ static int ci13xxx_msm_probe(struct platform_device *pdev)
 		goto gpio_uninstall;
 	}
 
+#ifdef CONFIG_USB_G_LGE_ANDROID
+    wake_lock_init(&_udc_ctxt.wlock, WAKE_LOCK_SUSPEND, "usb_bus_active");
+#endif
 	pm_runtime_no_callbacks(&pdev->dev);
 	pm_runtime_enable(&pdev->dev);
 
@@ -244,7 +289,11 @@ static int __init ci13xxx_msm_init(void)
 {
 	return platform_driver_register(&ci13xxx_msm_driver);
 }
+#ifdef CONFIG_LGE_PM
+device_initcall_sync(ci13xxx_msm_init);
+#else
 module_init(ci13xxx_msm_init);
+#endif
 
 static void __exit ci13xxx_msm_exit(void)
 {

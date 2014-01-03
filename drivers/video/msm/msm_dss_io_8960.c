@@ -661,7 +661,27 @@ void mipi_dsi_clk_enable(void)
 	if (clk_set_rate(dsi_byte_div_clk, 1) < 0)	/* divided by 1 */
 		pr_err("%s: dsi_byte_div_clk - "
 			"clk_set_rate failed\n", __func__);
+//                                                 
+/*
+#if defined(CONFIG_FB_MSM_MIPI_HITACHI_R69324A_VIDEO_WVGA_PT_PANEL) || \
+	defined(CONFIG_FB_MSM_MIPI_HIMAX_H8379A_VIDEO_WVGA_PT_PANEL)
+*/
+#if defined(CONFIG_FB_MSM_MIPI_HITACHI_R69324A_VIDEO_WVGA_PT_PANEL) || \
+	defined(CONFIG_FB_MSM_MIPI_HIMAX_H8379A_VIDEO_WVGA_PT_PANEL) || \
+	defined(CONFIG_FB_MSM_MIPI_HITACHI_R69328A_VIDEO_HD_PT_PANEL)
+//                                                  
+		if (clk_set_rate(dsi_esc_clk, 4) < 0) /* divided by esc */
+//                                                 
+/*
+#elif defined(CONFIG_FB_MSM_MIPI_TX11D108VM_VIDEO_QHD_PT_PANEL) 
+*/
+#elif defined(CONFIG_FB_MSM_MIPI_TX11D108VM_VIDEO_QHD_PT_PANEL)||\
+	defined(CONFIG_FB_MSM_MIPI_TX13D107VM_NT35521_VIDEO_HD_PT_PANEL)        
+//                                                 
+		if (clk_set_rate(dsi_esc_clk, 2) < 0) /* divided by esc */
+#else	/* QCT original */
 	if (clk_set_rate(dsi_esc_clk, esc_byte_ratio) < 0) /* divided by esc */
+#endif
 		pr_err("%s: dsi_esc_clk - "			 /* clk ratio */
 			"clk_set_rate failed\n", __func__);
 	mipi_dsi_pclk_ctrl(&dsi_pclk, 1);
