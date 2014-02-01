@@ -26,10 +26,6 @@
 
 */
 
-/*            */
-#define DEBUG
-
-
 #include <linux/module.h>	/* kernel module definitions */
 #include <linux/errno.h>
 #include <linux/init.h>
@@ -48,37 +44,22 @@
 #include <linux/param.h>
 #include <linux/bitops.h>
 #include <linux/termios.h>
-/*            */
-#include <linux/wakelock.h>
 #include <mach/gpio.h>
 #include <mach/msm_serial_hs.h>
 
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci_core.h> /* event notifications */
 #include "hci_uart.h"
-/*            */
 #include <asm/gpio.h>
 
-//                                             
-//ADD: 0019639: [F200][BT] Support Bluetooth low power mode
 #ifdef CONFIG_LGE_BLUESLEEP
-#ifndef FEATURE_USE_BTLA
-// Attention : The current polarity value is 0.
-#define FEATURE_USE_BTLA
-#endif/*FEATURE_USE_BTLA*/
-
-#ifdef FEATURE_USE_BTLA
 #define BT_PORT_NUM	0
-#endif/*FEATURE_USE_BTLA*/
-
 #define BTA_NOT_USE_ROOT_PERM
+#endif /*CONFIG_LGE_BLUESLEEP*/
 
 #ifdef BTA_NOT_USE_ROOT_PERM
 #define AID_BLUETOOTH       1002
-#endif  //BTA_NOT_USE_ROOT_PERM
-#endif/*                    */
-//                                           
-
+#endif /*BTA_NOT_USE_ROOT_PERM*/
 
 #define BT_SLEEP_DBG
 #ifndef BT_SLEEP_DBG
@@ -91,18 +72,11 @@
 #define VERSION		"1.1"
 #define PROC_DIR	"bluetooth/sleep"
 
-
 struct bluesleep_info {
 	unsigned host_wake;
 	unsigned ext_wake;
 	unsigned host_wake_irq;
 	struct uart_port *uport;
-//                                             
-//ADD: 0019639: [F200][BT] Support Bluetooth low power mode
-#ifdef FEATURE_USE_BTLA	
-	struct wake_lock wake_lock;
-#endif/*FEATURE_USE_BTLA*/
-//                                           
 };
 
 /* work function */
@@ -117,13 +91,8 @@ DECLARE_DELAYED_WORK(sleep_workqueue, bluesleep_sleep_work);
 #define bluesleep_rx_idle()     schedule_delayed_work(&sleep_workqueue, 0)
 #define bluesleep_tx_idle()     schedule_delayed_work(&sleep_workqueue, 0)
 
-//                                             
-//MOD: 0019639: [F200][BT] Support Bluetooth low power mode
-// Fixed power consumtion problem when connected with Samsung stereo headset. 
-/* 5 second timeout */
-#define TX_TIMER_INTERVAL	5 //1 --> 5
-#define TX_TIMER_SLEEP_INTERVAL	TX_TIMER_INTERVAL//Add
-//                                             
+/* 1 second timeout */
+#define TX_TIMER_INTERVAL	1
 
 /* state variable names and bit positions */
 #define BT_PROTO	0x01
@@ -138,16 +107,12 @@ static struct bluesleep_info *bsi;
 /* module usage */
 static atomic_t open_count = ATOMIC_INIT(1);
 
-//                                             
-//DEL: 0019639: [F200][BT] Support Bluetooth low power mode
 /*
  * Local function prototypes
  */
-#ifndef FEATURE_USE_BTLA
+
 static int bluesleep_hci_event(struct notifier_block *this,
 			    unsigned long event, void *data);
-#endif/*FEATURE_USE_BTLA*/				
-//                                           
 
 /*
  * Global variables
@@ -165,15 +130,10 @@ static struct timer_list tx_timer;
 /** Lock for state transitions */
 static spinlock_t rw_lock;
 
-//                                             
-//DEL: 0019639: [F200][BT] Support Bluetooth low power mode
-#ifndef FEATURE_USE_BTLA
 /** Notifier block for HCI events */
 struct notifier_block hci_event_nblock = {
 	.notifier_call = bluesleep_hci_event,
 };
-#endif/*FEATURE_USE_BTLA*/
-//                                           
 
 struct proc_dir_entry *bluetooth_dir, *sleep_dir;
 
@@ -182,15 +142,11 @@ struct proc_dir_entry *bluetooth_dir, *sleep_dir;
  */
 
 static void hsuart_power(int on)
-{	
+{
 	if (on) {
-		/*            */
-		BT_DBG("hsuart_power : 1");
 		msm_hs_request_clock_on(bsi->uport);
 		msm_hs_set_mctrl(bsi->uport, TIOCM_RTS);
 	} else {
-		/*            */
-		BT_DBG("hsuart_power : 0");
 		msm_hs_set_mctrl(bsi->uport, 0);
 		msm_hs_request_clock_off(bsi->uport);
 	}
@@ -203,10 +159,6 @@ static void hsuart_power(int on)
 static inline int bluesleep_can_sleep(void)
 {
 	/* check if MSM_WAKE_BT_GPIO and BT_WAKE_MSM_GPIO are both deasserted */
-	
-	/*            */
-	BT_DBG("bluesleep_can_sleep : ext_wake = %d, host_wake = %d", gpio_get_value(bsi->ext_wake), gpio_get_value(bsi->host_wake));		
-	
 	return gpio_get_value(bsi->ext_wake) &&
 		gpio_get_value(bsi->host_wake) &&
 		(bsi->uport != NULL);
@@ -216,18 +168,10 @@ void bluesleep_sleep_wakeup(void)
 {
 	if (test_bit(BT_ASLEEP, &flags)) {
 		BT_DBG("waking up...");
-//                                             
-//MOD: 0019639: [F200][BT] Support Bluetooth low power mode
-#ifdef FEATURE_USE_BTLA
-		wake_lock(&bsi->wake_lock);		
-#else/*FEATURE_USE_BTLA*/
 		/* Start the timer */
 		mod_timer(&tx_timer, jiffies + (TX_TIMER_INTERVAL * HZ));
 		gpio_set_value(bsi->ext_wake, 0);
-#endif/*FEATURE_USE_BTLA*/	
-//                                            
-
-		clear_bit(BT_ASLEEP, &flags);		
+		clear_bit(BT_ASLEEP, &flags);
 		/*Activating UART */
 		hsuart_power(1);
 	}
@@ -252,13 +196,8 @@ void bluesleep_sleep_wakeup(void)
  */
 static void bluesleep_sleep_work(struct work_struct *work)
 {
-	/*            */
-	BT_DBG("+++ bluesleep_sleep_work");
-
 	if (bluesleep_can_sleep()) {
 		/* already asleep, this is an error case */
-		/*            */
-		BT_DBG("bluesleep_can_sleep is true");
 		if (test_bit(BT_ASLEEP, &flags)) {
 			BT_DBG("already asleep");
 			return;
@@ -269,32 +208,13 @@ static void bluesleep_sleep_work(struct work_struct *work)
 			set_bit(BT_ASLEEP, &flags);
 			/*Deactivating UART */
 			hsuart_power(0);
-
-//                                             
-//ADD: 0019639: [F200][BT] Support Bluetooth low power mode		
-#ifdef FEATURE_USE_BTLA
-			wake_lock_timeout(&bsi->wake_lock, HZ / 2);
-#endif/*FEATURE_USE_BTLA*/
-//                                           
-		}
-//                                             
-//DEL: 0019639: [F200][BT] Support Bluetooth low power mode		
-#ifndef FEATURE_USE_BTLA		 
-		else {
-			//BT_DBG("Do not anything modtimer...");
+		} else {
 		  	mod_timer(&tx_timer, jiffies + (TX_TIMER_INTERVAL * HZ));
 			return;
 		}
-#endif/*FEATURE_USE_BTLA*/		
-//                                           
 	} else {
-		/*            */
-		BT_DBG("Call BT Wake Up");
 		bluesleep_sleep_wakeup();
 	}
-
-	/*            */
-	BT_DBG("--- bluesleep_sleep_work");
 }
 
 /**
@@ -308,38 +228,14 @@ static void bluesleep_hostwake_task(unsigned long data)
 
 	spin_lock(&rw_lock);
 
-//                                             
-//MOD: 0019639: [F200][BT] Support Bluetooth low power mode
-#ifdef FEATURE_USE_BTLA
-	if(gpio_get_value(bsi->host_wake) == 0)
-	{
-		BT_DBG("hostwake GPIO Low");
-		// Do not need to check GPIO
-		bluesleep_rx_busy();
-		//Fixed power consumtion problem when connected with Samsung stereo headset. 		
-		mod_timer(&tx_timer, jiffies + (TX_TIMER_INTERVAL * HZ));//CHPARK_TEST		
-	}
-	else
-	{
-		BT_DBG("hostwake GPIO High");
-//LG_BTUI_S : merged from VS870
-		bluesleep_rx_idle();
-//LG_BTUI_E
-	}
-#else/*FEATURE_USE_BTLA*/
 	if (gpio_get_value(bsi->host_wake))
 		bluesleep_rx_busy();
 	else
 		bluesleep_rx_idle();
-#endif/*                                             */
-//                                           
 
 	spin_unlock(&rw_lock);
 }
 
-//                                             
-//DEL: 0019639: [F200][BT] Support Bluetooth low power mode
-#ifndef FEATURE_USE_BTLA
 /**
  * Handles proper timer action when outgoing data is delivered to the
  * HCI line discipline. Sets BT_TXDATA.
@@ -400,8 +296,6 @@ static int bluesleep_hci_event(struct notifier_block *this,
 
 	return NOTIFY_DONE;
 }
-#endif/*FEATURE_USE_BTLA*/
-//                                           
 
 /**
  * Handles transmission timer expiration.
@@ -410,42 +304,11 @@ static int bluesleep_hci_event(struct notifier_block *this,
 static void bluesleep_tx_timer_expire(unsigned long data)
 {
 	unsigned long irq_flags;
-//                                                  
-	int host_wake; 
-//LG_BTUI_E Add timer modifier
 
 	spin_lock_irqsave(&rw_lock, irq_flags);
 
 	BT_DBG("Tx timer expired");
 
-//                                             
-//MOD: 0019639: [F200][BT] Support Bluetooth low power mode	
-#ifdef FEATURE_USE_BTLA
-	/* already asleep, this is an error case */
-	if (test_bit(BT_ASLEEP, &flags)) {
-		//BT_DBG("already asleep");
-		spin_unlock_irqrestore(&rw_lock, irq_flags);
-		return;
-	}
-	
-//[LG_BTUI] Add timer modifier [s]
-//If HOST_WAKE is retained in low state after 5sec timer expired, We can't go to sleep.
-//origns : bluesleep_tx_idle();	
-
-	host_wake = gpio_get_value(bsi->host_wake);
-	BT_DBG("check host_wake status :%d", host_wake);	
-	
-    if (host_wake == 0)
-	{
-        BT_DBG("Tx timer re set");
-        mod_timer(&tx_timer, jiffies + (TX_TIMER_INTERVAL*HZ));
-    }
-    else
-    {
-        bluesleep_tx_idle();
-    }
-//                                     
-#else/*FEATURE_USE_BTLA*/
 	/* were we silent during the last timeout? */
 	if (!test_bit(BT_TXDATA, &flags)) {
 		BT_DBG("Tx has been idle");
@@ -458,8 +321,6 @@ static void bluesleep_tx_timer_expire(unsigned long data)
 
 	/* clear the incoming data flag */
 	clear_bit(BT_TXDATA, &flags);
-#endif/*FEATURE_USE_BTLA*/
-//                                           
 
 	spin_unlock_irqrestore(&rw_lock, irq_flags);
 }
@@ -472,32 +333,8 @@ static void bluesleep_tx_timer_expire(unsigned long data)
  */
 static irqreturn_t bluesleep_hostwake_isr(int irq, void *dev_id)
 {
-//                                             
-//MOD: 0019639: [F200][BT] Support Bluetooth low power mode
-#ifdef FEATURE_USE_BTLA
 	/* schedule a tasklet to handle the change in the host wake line */
-	int wake, host_wake;
-	wake = gpio_get_value(bsi->ext_wake);
-	host_wake = gpio_get_value(bsi->host_wake);
-	printk(KERN_DEBUG "bluesleep_hostwake_isr %d, %d", wake, host_wake);
-
-	irq_set_irq_type(irq, host_wake ? IRQF_TRIGGER_LOW : IRQF_TRIGGER_HIGH);
-
-#ifdef CONFIG_LGE_BLUESLEEP
-	BT_DBG("bluesleep_hostwake_isr : Registration Tasklet");
 	tasklet_schedule(&hostwake_task);
-#else
-	if (host_wake == 0)
-	{
-		BT_DBG("bluesleep_hostwake_isr : Registration Tasklet");
-		tasklet_schedule(&hostwake_task);
-	}
-#endif
-#else/*FEATURE_USE_BTLA*/
-	tasklet_schedule(&hostwake_task);
-#endif/*FEATURE_USE_BTLA*/	
-//                                           
-	
 	return IRQ_HANDLED;
 }
 
@@ -510,9 +347,6 @@ static int bluesleep_start(void)
 {
 	int retval;
 	unsigned long irq_flags;
-	
-	/*            */
-	BT_DBG("bluesleep_start");
 
 	spin_lock_irqsave(&rw_lock, irq_flags);
 
@@ -528,39 +362,15 @@ static int bluesleep_start(void)
 		return -EBUSY;
 	}
 
-//                                             
-//DEL: 0019639: [F200][BT] Support Bluetooth low power mode	
-#ifndef FEATURE_USE_BTLA
 	/* start the timer */
 
 	mod_timer(&tx_timer, jiffies + (TX_TIMER_INTERVAL*HZ));
+
 	/* assert BT_WAKE */
-	gpio_set_value(bsi->ext_wake, 0);	
-#endif/*FEATURE_USE_BTLA*/	
-//                                            
-	
-
-//                                             
-//ADD: 0019639: [F200][BT] Support Bluetooth low power mode		
-#ifdef FEATURE_USE_BTLA
-	BT_DBG("bluesleep_start");
-	hsuart_power(1);
-#endif/*FEATURE_USE_BTLA*/
-//                                           
-
-//                                             
-//MOD: 0019639: [F200][BT] Support Bluetooth low power mode
-#ifdef FEATURE_USE_BTLA
-	retval = request_irq(bsi->host_wake_irq, bluesleep_hostwake_isr,
-				IRQF_DISABLED | IRQF_TRIGGER_LOW,
-				"bluetooth hostwake", NULL);
-#else/*FEATURE_USE_BTLA*/
+	gpio_set_value(bsi->ext_wake, 0);
 	retval = request_irq(bsi->host_wake_irq, bluesleep_hostwake_isr,
 				IRQF_DISABLED | IRQF_TRIGGER_FALLING,
 				"bluetooth hostwake", NULL);
-#endif/*FEATURE_USE_BTLA*/	
-//                                           
-				
 	if (retval  < 0) {
 		BT_ERR("Couldn't acquire BT_HOST_WAKE IRQ");
 		goto fail;
@@ -574,20 +384,9 @@ static int bluesleep_start(void)
 	}
 
 	set_bit(BT_PROTO, &flags);
-//                                             
-//ADD: 0019639: [F200][BT] Support Bluetooth low power mode		
-#ifdef FEATURE_USE_BTLA
-	wake_lock(&bsi->wake_lock);
-#endif/*FEATURE_USE_BTLA*/
-//                                           
 	return 0;
 fail:
-//                                             
-//DEL: 0019639: [F200][BT] Support Bluetooth low power mode
-#ifndef FEATURE_USE_BTLA
 	del_timer(&tx_timer);
-#endif/*FEATURE_USE_BTLA*/	
-//                                           
 	atomic_inc(&open_count);
 
 	return retval;
@@ -607,40 +406,15 @@ static void bluesleep_stop(void)
 		return;
 	}
 
-	/*            */
-	BT_DBG("bluesleep_stop");	
-
-
-//                                             
-//MOD: 0019639: [F200][BT] Support Bluetooth low power mode
-#ifndef FEATURE_USE_BTLA
 	/* assert BT_WAKE */
 	gpio_set_value(bsi->ext_wake, 0);
 	del_timer(&tx_timer);
-#endif/*FEATURE_USE_BTLA*/
-//                                           
-
 	clear_bit(BT_PROTO, &flags);
 
 	if (test_bit(BT_ASLEEP, &flags)) {
 		clear_bit(BT_ASLEEP, &flags);
-//                                             
-//ADD: 0019639: [F200][BT] Support Bluetooth low power mode 	
-#ifndef FEATURE_USE_BTLA
 		hsuart_power(1);
-#endif/*FEATURE_USE_BTLA*/
-//                                           
 	}
-//                                             
-//ADD: 0019639: [F200][BT] Support Bluetooth low power mode 	
-#ifdef FEATURE_USE_BTLA	
-	else
-	{
-		//set_bit(BT_ASLEEP, &flags);
-		hsuart_power(0);
-	}
-#endif/*FEATURE_USE_BTLA*/
-//                                           
 
 	atomic_inc(&open_count);
 
@@ -648,12 +422,6 @@ static void bluesleep_stop(void)
 	if (disable_irq_wake(bsi->host_wake_irq))
 		BT_ERR("Couldn't disable hostwake IRQ wakeup mode\n");
 	free_irq(bsi->host_wake_irq, NULL);
-//                                             
-//ADD: 0019639: [F200][BT] Support Bluetooth low power mode 	
-#ifdef FEATURE_USE_BTLA		
-	wake_lock_timeout(&bsi->wake_lock, HZ / 2);
-#endif/*FEATURE_USE_BTLA*/
-//                                            
 }
 /**
  * Read the <code>BT_WAKE</code> GPIO pin value via the proc interface.
@@ -701,26 +469,9 @@ static int bluepower_write_proc_btwake(struct file *file, const char *buffer,
 	}
 
 	if (buf[0] == '0') {
-		/*            */
-		BT_DBG("BT WAKE Set to Wake");
-	
 		gpio_set_value(bsi->ext_wake, 0);
-//                                             
-//ADD: 0019639: [F200][BT] Support Bluetooth low power mode	
-#ifdef FEATURE_USE_BTLA		
-		//set_bit(BT_TXDATA, &flags);
-		bluesleep_sleep_wakeup();
-#endif/*FEATURE_USE_BTLA*/
-//                                             
 	} else if (buf[0] == '1') {
-		BT_DBG("BT WAKE Set to Sleep");
 		gpio_set_value(bsi->ext_wake, 1);
-//                                             
-//ADD: 0019639: [F200][BT] Support Bluetooth low power mode	
-#ifdef FEATURE_USE_BTLA			
-		bluesleep_tx_idle();
-#endif/*FEATURE_USE_BTLA*/
-//                                            
 	} else {
 		kfree(buf);
 		return -EINVAL;
@@ -877,14 +628,7 @@ static int __init bluesleep_probe(struct platform_device *pdev)
 #ifdef CONFIG_LGE_BLUESLEEP
 	bsi->uport= msm_hs_get_bt_uport(BT_PORT_NUM);
 #endif/*                             */
-//                                           
-
-//                                             
-//ADD: 0019639: [F200][BT] Support Bluetooth low power mode	
-#ifdef FEATURE_USE_BTLA	
-	wake_lock_init(&bsi->wake_lock, WAKE_LOCK_SUSPEND, "bluesleep");
-#endif/*FEATURE_USE_BTLA*/
-//                                            
+//                                                                                      
 
 	return 0;
 
@@ -912,12 +656,6 @@ static int bluesleep_remove(struct platform_device *pdev)
 
 	gpio_free(bsi->host_wake);
 	gpio_free(bsi->ext_wake);
-//                                             
-//ADD: 0019639: [F200][BT] Support Bluetooth low power mode
-#ifdef FEATURE_USE_BTLA	
-	wake_lock_destroy(&bsi->wake_lock);
-#endif/*FEATURE_USE_BTLA*/
-//                                           
 	kfree(bsi);
 	return 0;
 }
@@ -1022,12 +760,7 @@ static int __init bluesleep_init(void)
 	/* initialize host wake tasklet */
 	tasklet_init(&hostwake_task, bluesleep_hostwake_task, 0);
 
-//                                             
-//ADD: 0019639: [F200][BT] Support Bluetooth low power mode
-#ifndef FEATURE_USE_BTLA
 	hci_register_notifier(&hci_event_nblock);
-#endif/*FEATURE_USE_BTLA*/
-//                                            
 
 	return 0;
 
@@ -1046,12 +779,7 @@ fail:
  */
 static void __exit bluesleep_exit(void)
 {
-//                                             
-//ADD: 0019639: [F200][BT] Support Bluetooth low power mode
-#ifndef FEATURE_USE_BTLA
 	hci_unregister_notifier(&hci_event_nblock);
-#endif/*FEATURE_USE_BTLA*/
-//                                             
 	platform_driver_unregister(&bluesleep_driver);
 
 	remove_proc_entry("asleep", sleep_dir);
