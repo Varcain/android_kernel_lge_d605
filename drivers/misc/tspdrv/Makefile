@@ -26,7 +26,7 @@
 # =========================================================================
 
 ifdef CONFIG_MACH_LGE_L9II_COMMON
-obj-$(CONFIG_TSPDRV)    += tspdrv_l9ii.o
+obj-$(CONFIG_TSPDRV)    += tspdrv_l9ii.o imm_timed_output.o
 else
 obj-$(CONFIG_TSPDRV)	+= tspdrv.o
 endif

@@ -221,7 +221,7 @@ static void vibrator_ic_enable_set(int enable)
 /*
 ** Called to disable amp (disable output force)
 */
-IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_AmpDisable(VibeUInt8 nActuatorIndex)
+VibeStatus ImmVibeSPI_ForceOut_AmpDisable(VibeUInt8 nActuatorIndex)
 {
     if (g_bAmpEnabled)
     {
@@ -250,7 +250,7 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_AmpDisable(VibeUInt8 nActuatorIndex
 /*
 ** Called to enable amp (enable output force)
 */
-IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_AmpEnable(VibeUInt8 nActuatorIndex)
+VibeStatus ImmVibeSPI_ForceOut_AmpEnable(VibeUInt8 nActuatorIndex)
 {
     if (!g_bAmpEnabled)
     {
@@ -264,7 +264,7 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_AmpEnable(VibeUInt8 nActuatorIndex)
 #ifdef CONFIG_MACH_LGE_L9II_COMMON
 		vibrator_power(1);
         vibratror_pwm_gpio_OnOFF(1);
-		vibrator_pwm_set(1, 0, GP_CLK_N_DEFAULT);
+		vibrator_pwm_set(1, 127, GP_CLK_N_DEFAULT);
 		vibrator_ic_enable_set(1);
 #else
 		pm8xxx_vib_set(vib_dev, 1, 0);
