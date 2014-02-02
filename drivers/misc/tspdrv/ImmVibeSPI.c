@@ -126,16 +126,10 @@ static int vibrator_clock_off(void)
 
 static int vibratror_pwm_gpio_OnOFF(int OnOFF)
 {
-    int rc = 0;
-
     if (OnOFF) {
-		rc = gpio_request(GPIO_LIN_MOTOR_PWM, "lin_motor_pwm");
-		if (unlikely(rc < 0)) {
-			printk("%s:GPIO_LIN_MOTOR_PWM(%d) request failed(%d)\n", __func__, GPIO_LIN_MOTOR_PWM, rc);
-			return rc;
-		}
+	gpio_set_value(GPIO_LIN_MOTOR_PWM, 1);
     } else {
-        gpio_free(GPIO_LIN_MOTOR_PWM);
+        gpio_set_value(GPIO_LIN_MOTOR_PWM, 0);
     }
     return 0;
 }
@@ -309,6 +303,7 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_Initialize(void)
 		printk("%s:GPIO_LIN_MOTOR_PWM(%d) request failed(%d)\n", __func__, GPIO_LIN_MOTOR_PWM, rc);
 		return rc;
 	}
+	gpio_direction_output(GPIO_LIN_MOTOR_PWM, 0);
 
     vibrator_clock_init();
 #endif	
