@@ -94,7 +94,8 @@
 #ifdef CONFIG_USB_G_LGE_ANDROID_AUTORUN
 #include "f_charge_only.c"
 #endif
-#if defined(CONFIG_USB_G_LGE_ANDROID)
+/*#if defined(CONFIG_USB_G_LGE_ANDROID)*/
+#if 0
 #if defined(CONFIG_USB_ANDROID_CDC_ECM)
 #include "f_ecm.c"
 #endif
@@ -107,7 +108,8 @@
 #include "u_ether.c"
 #include "u_bam_data.c"
 #include "f_mbim.c"
-#if !defined(CONFIG_USB_G_LGE_ANDROID)
+/*#if !defined(CONFIG_USB_G_LGE_ANDROID)*/
+#if 1
 #include "f_qc_ecm.c"
 #include "f_qc_rndis.c"
 #include "u_qc_ether.c"
@@ -671,7 +673,8 @@ static struct android_usb_function rmnet_function = {
 /*-------------------------------------------------------------------------*/
 /* ECM */
 /*-------------------------------------------------------------------------*/
-#if defined(CONFIG_USB_ANDROID_CDC_ECM)
+/*#if defined(CONFIG_USB_ANDROID_CDC_ECM)*/
+#if 0
 struct ecm_function_config {
 	u8      ethaddr[ETH_ALEN];
 };
@@ -782,7 +785,8 @@ static struct android_usb_function ecm_function = {
 };
 #endif
 
-#if !defined(CONFIG_USB_G_LGE_ANDROID)
+/*#if !defined(CONFIG_USB_G_LGE_ANDROID)*/
+#if 0
 static int ecm_qc_function_bind_config(struct android_usb_function *f,
 					struct usb_configuration *c)
 {
@@ -1258,7 +1262,8 @@ static struct android_usb_function ptp_function = {
 	.bind_config	= ptp_function_bind_config,
 };
 
-#if !defined(CONFIG_USB_G_LGE_ANDROID)
+/*#if !defined(CONFIG_USB_G_LGE_ANDROID)*/
+#if 1
 struct rndis_function_config {
 	u8      ethaddr[ETH_ALEN];
 	u32     vendorID;
@@ -1954,7 +1959,8 @@ static struct android_usb_function uasp_function = {
 
 static struct android_usb_function *supported_functions[] = {
 	&mbim_function,
-#if !defined(CONFIG_USB_G_LGE_ANDROID)
+/*#if !defined(CONFIG_USB_G_LGE_ANDROID)*/
+#if 0
 	&ecm_qc_function,
 #endif
 	&audio_function,
@@ -1970,7 +1976,8 @@ static struct android_usb_function *supported_functions[] = {
 	&acm_function,
 	&mtp_function,
 	&ptp_function,
-#if defined(CONFIG_USB_G_LGE_ANDROID)
+/*#if defined(CONFIG_USB_G_LGE_ANDROID)*/
+#if 0
 #if defined(CONFIG_USB_ANDROID_CDC_ECM)
 	&ecm_function,
 #endif
