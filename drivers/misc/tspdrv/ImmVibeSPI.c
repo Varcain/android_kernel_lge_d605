@@ -37,7 +37,7 @@
 #include <mach/gpiomux.h>
 #include <mach/msm_iomap.h>
 #include <mach/msm_xo.h>
-#include "../../kernel/arch/arm/mach-msm/lge/fx3/board-fx3.h"
+#include "../../../arch/arm/mach-msm/lge/fx3/board-fx3.h"
 #include <linux/delay.h>
 #else
 #include <tspdrv_util.h>
