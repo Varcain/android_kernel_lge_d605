@@ -126,16 +126,10 @@ static int vibrator_clock_off(void)
 
 static int vibratror_pwm_gpio_OnOFF(int OnOFF)
 {
-    int rc = 0;
-
     if (OnOFF) {
-		rc = gpio_request(GPIO_LIN_MOTOR_PWM, "lin_motor_pwm");
-		if (unlikely(rc < 0)) {
-			printk("%s:GPIO_LIN_MOTOR_PWM(%d) request failed(%d)\n", __func__, GPIO_LIN_MOTOR_PWM, rc);
-			return rc;
-		}
+	gpio_set_value(GPIO_LIN_MOTOR_PWM, 1);
     } else {
-        gpio_free(GPIO_LIN_MOTOR_PWM);
+        gpio_set_value(GPIO_LIN_MOTOR_PWM, 0);
     }
     return 0;
 }
@@ -221,7 +215,7 @@ static void vibrator_ic_enable_set(int enable)
 /*
 ** Called to disable amp (disable output force)
 */
-IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_AmpDisable(VibeUInt8 nActuatorIndex)
+VibeStatus ImmVibeSPI_ForceOut_AmpDisable(VibeUInt8 nActuatorIndex)
 {
     if (g_bAmpEnabled)
     {
@@ -250,7 +244,7 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_AmpDisable(VibeUInt8 nActuatorIndex
 /*
 ** Called to enable amp (enable output force)
 */
-IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_AmpEnable(VibeUInt8 nActuatorIndex)
+VibeStatus ImmVibeSPI_ForceOut_AmpEnable(VibeUInt8 nActuatorIndex)
 {
     if (!g_bAmpEnabled)
     {
@@ -264,7 +258,7 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_AmpEnable(VibeUInt8 nActuatorIndex)
 #if defined (CONFIG_MACH_LGE_L9II_COMMON)
 		vibrator_power(1);
         vibratror_pwm_gpio_OnOFF(1);
-		vibrator_pwm_set(1, 0, GP_CLK_N_DEFAULT);
+		vibrator_pwm_set(1, 127, GP_CLK_N_DEFAULT);
 		vibrator_ic_enable_set(1);
 #else
 		pm8xxx_vib_set(vib_dev, 1, 0);
@@ -309,6 +303,7 @@ IMMVIBESPIAPI VibeStatus ImmVibeSPI_ForceOut_Initialize(void)
 		printk("%s:GPIO_LIN_MOTOR_PWM(%d) request failed(%d)\n", __func__, GPIO_LIN_MOTOR_PWM, rc);
 		return rc;
 	}
+	gpio_direction_output(GPIO_LIN_MOTOR_PWM, 0);
 
     vibrator_clock_init();
 #endif	

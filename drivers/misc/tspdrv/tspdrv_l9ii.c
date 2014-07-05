@@ -41,6 +41,7 @@
 #include <asm/atomic.h>
 #include "tspdrv_l9ii.h"
 #include <linux/wakelock.h>
+#include "imm_timed_output.h"
 
 static int g_nTimerPeriodMs = 5; /* 5ms timer by default. This variable could be used by the SPI.*/
 
@@ -245,6 +246,8 @@ static int __init tspdrv_init(void)
     }
 
     wake_lock_init(&tspdrv_wakelock, WAKE_LOCK_SUSPEND, MODULE_NAME);
+
+    ImmVibe_timed_output();
 
     return 0;
 }
