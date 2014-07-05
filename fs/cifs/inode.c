@@ -800,9 +800,13 @@ cifs_find_inode(struct inode *inode, void *opaque)
 		return 0;
 
 	/* if it's not a directory or has no dentries, then flag it */
-	if (S_ISDIR(inode->i_mode) && !list_empty(&inode->i_dentry))
+	if (S_ISDIR(inode->i_mode) && !list_empty(&inode->i_dentry)){
 		fattr->cf_flags |= CIFS_FATTR_INO_COLLISION;
-
+		//                                                     
+		cifs_autodisable_serverino(CIFS_SB(inode->i_sb));
+		//                                                     
+		
+	}
 	return 1;
 }
 

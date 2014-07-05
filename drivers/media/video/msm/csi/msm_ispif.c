@@ -31,6 +31,33 @@ static atomic_t ispif_irq_cnt;
 static spinlock_t ispif_tasklet_lock;
 static struct list_head ispif_tasklet_q;
 
+/*                                                                   */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+#define ABANDON_TIMEOUT_VAL 5*1000
+static int is_abandon_flag = 0;
+static void abandon_fn(struct work_struct *work);
+static DECLARE_DELAYED_WORK(abandon_work, abandon_fn);
+
+static void abandon_fn(struct work_struct *work)
+{
+	is_abandon_flag = 1;
+	return;
+}
+
+#define INIT_ABANDON_WORK() do{cancel_delayed_work(&abandon_work);\
+								is_abandon_flag=0;\
+								schedule_delayed_work(&abandon_work, msecs_to_jiffies(ABANDON_TIMEOUT_VAL));}while(0);
+
+#define MSM_ISPIF_WAIT_FOR_SIG_JUMP(lable)	do{if(is_abandon_flag == 1){\
+												goto lable;}}while(0);
+
+#define MSM_ISPIF_WAIT_FOR_SIG_JUMP2(var, label)do{if(is_abandon_flag == 1){\
+													var = -EBUSY;goto label;}}while(0);
+
+#define DEINIT_ABANDON_WORK() do{cancel_delayed_work(&abandon_work);}while(0);
+#endif
+/*                                                                 */
+
 static int msm_ispif_intf_reset(struct ispif_device *ispif,
 	uint16_t intfmask, uint8_t vfe_intf)
 {
@@ -130,6 +157,7 @@ static void msm_ispif_sel_csid_core(struct ispif_device *ispif,
 	}
 	data = msm_camera_io_r(ispif->base + ISPIF_INPUT_SEL_ADDR +
 		(0x200 * vfe_intf));
+	pr_err("%s: intftype = %d reg=%d , csid =%d \n", __func__,intftype, data,csid );
 	switch (intftype) {
 	case PIX0:
 		data &= ~(0x3);
@@ -350,6 +378,13 @@ static void msm_ispif_intf_cmd(struct ispif_device *ispif, uint16_t intfmask,
 	uint16_t mask = intfmask, intfnum = 0;
 	uint32_t cid_mask = 0;
 	uint32_t global_intf_cmd_mask1 = 0xFFFFFFFF;
+
+/*                                                                   */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+	INIT_ABANDON_WORK();
+#endif
+/*                                                                 */
+
 	while (mask != 0) {
 		if (!(intfmask & (0x1 << intfnum))) {
 			mask >>= 1;
@@ -380,7 +415,15 @@ static void msm_ispif_intf_cmd(struct ispif_device *ispif, uint16_t intfmask,
 		}
 		mask >>= 1;
 		intfnum++;
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+		MSM_ISPIF_WAIT_FOR_SIG_JUMP(init_end);
+#endif
 	}
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+init_end:
+	DEINIT_ABANDON_WORK();
+#endif
+
 	msm_camera_io_w(ispif->global_intf_cmd_mask,
 		ispif->base + ISPIF_INTF_CMD_ADDR + (0x200 * vfe_intf));
 	if (global_intf_cmd_mask1 != 0xFFFFFFFF)
@@ -435,6 +478,12 @@ static int msm_ispif_stop_intf_transfer(struct ispif_device *ispif,
 	CDBG("%s intfmask %x intf_cmd_mask %x\n", __func__, intfmask,
 		intf_cmd_mask);
 	msm_ispif_intf_cmd(ispif, intfmask, intf_cmd_mask, vfe_intf);
+
+/*                                                                   */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+	INIT_ABANDON_WORK();
+#endif
+/*                                                                 */
 	while (mask != 0) {
 		if (intfmask & (0x1 << intfnum)) {
 			switch (intfnum) {
@@ -444,6 +493,11 @@ static int msm_ispif_stop_intf_transfer(struct ispif_device *ispif,
 					(0x200 * vfe_intf))
 					& 0xf) != 0xf) {
 					CDBG("Wait for pix0 Idle\n");
+/*                                                                   */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+					MSM_ISPIF_WAIT_FOR_SIG_JUMP2(rc, stop_end);
+#endif
+/*                                                                 */
 				}
 				break;
 
@@ -453,6 +507,11 @@ static int msm_ispif_stop_intf_transfer(struct ispif_device *ispif,
 					(0x200 * vfe_intf))
 					& 0xf) != 0xf) {
 					CDBG("Wait for rdi0 Idle\n");
+/*                                                                   */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+					MSM_ISPIF_WAIT_FOR_SIG_JUMP2(rc, stop_end);
+#endif
+/*                                                                 */
 				}
 				break;
 
@@ -462,6 +521,11 @@ static int msm_ispif_stop_intf_transfer(struct ispif_device *ispif,
 					(0x200 * vfe_intf))
 					& 0xf) != 0xf) {
 					CDBG("Wait for pix1 Idle\n");
+/*                                                                   */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+					MSM_ISPIF_WAIT_FOR_SIG_JUMP2(rc, stop_end);
+#endif
+/*                                                                 */
 				}
 				break;
 
@@ -471,6 +535,11 @@ static int msm_ispif_stop_intf_transfer(struct ispif_device *ispif,
 					(0x200 * vfe_intf))
 					& 0xf) != 0xf) {
 					CDBG("Wait for rdi1 Idle\n");
+/*                                                                   */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+					MSM_ISPIF_WAIT_FOR_SIG_JUMP2(rc, stop_end);
+#endif
+/*                                                                 */
 				}
 				break;
 
@@ -480,6 +549,11 @@ static int msm_ispif_stop_intf_transfer(struct ispif_device *ispif,
 					(0x200 * vfe_intf))
 					& 0xf) != 0xf) {
 					CDBG("Wait for rdi2 Idle\n");
+/*                                                                   */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+					MSM_ISPIF_WAIT_FOR_SIG_JUMP2(rc, stop_end);
+#endif
+/*                                                                 */
 				}
 				break;
 
@@ -492,7 +566,14 @@ static int msm_ispif_stop_intf_transfer(struct ispif_device *ispif,
 		}
 		mask >>= 1;
 		intfnum++;
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+		MSM_ISPIF_WAIT_FOR_SIG_JUMP2(rc, stop_end);
+#endif
 	}
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+stop_end:
+	DEINIT_ABANDON_WORK();
+#endif
 	mutex_unlock(&ispif->mutex);
 	return rc;
 }

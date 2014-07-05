@@ -543,6 +543,115 @@ static int msm_voice_fens_get(struct snd_kcontrol *kcontrol,
 	return 0;
 }
 
+/* [FX3 AUDIO_BSP] SPCS&MPCS Voice call Volume level is 7 steps */
+#if defined(CONFIG_MACH_LGE_FX3_SPCS) || defined(CONFIG_MACH_LGE_FX3_MPCS) || \
+	defined(CONFIG_MACH_LGE_FX3_TMUS) || defined(CONFIG_MACH_LGE_F6_TMUS) || \
+	defined(CONFIG_MACH_LGE_FX3_SPCSTRF) || defined(CONFIG_MACH_LGE_FX3_CRK) || \
+    defined(CONFIG_MACH_LGE_FX3_WCDMA_TRF_US) || defined(CONFIG_MACH_LGE_L9II_COMMON) || \
+    defined(CONFIG_MACH_LGE_F6_VDF) || defined(CONFIG_MACH_LGE_F6_ORG) || \
+    defined(CONFIG_MACH_LGE_F6_OPEN) || defined(CONFIG_MACH_LGE_F6_TMO)
+static struct snd_kcontrol_new msm_voice_controls[] = {
+	SOC_SINGLE_EXT("Voice Rx Device Mute", SND_SOC_NOPM, 0, 1, 0,
+				msm_voice_rx_device_mute_get,
+				msm_voice_rx_device_mute_put),
+	SOC_SINGLE_EXT("Voice Tx Mute", SND_SOC_NOPM, 0, 1, 0,
+				msm_voice_mute_get, msm_voice_mute_put),
+	SOC_SINGLE_EXT("Voice Rx Volume", SND_SOC_NOPM, 0, 6, 0,
+				msm_voice_volume_get, msm_voice_volume_put),
+	SOC_ENUM_EXT("TTY Mode", msm_tty_mode_enum[0], msm_voice_tty_mode_get,
+				msm_voice_tty_mode_put),
+	SOC_SINGLE_EXT("Widevoice Enable", SND_SOC_NOPM, 0, 1, 0,
+			msm_voice_widevoice_get, msm_voice_widevoice_put),
+	SOC_SINGLE_EXT("Slowtalk Enable", SND_SOC_NOPM, 0, 1, 0,
+				msm_voice_slowtalk_get, msm_voice_slowtalk_put),
+	SOC_SINGLE_EXT("FENS Enable", SND_SOC_NOPM, 0, 1, 0,
+				msm_voice_fens_get, msm_voice_fens_put),
+	SOC_SINGLE_EXT("VoLTE Rx Device Mute", SND_SOC_NOPM, 0, 1, 0,
+			msm_volte_rx_device_mute_get,
+			msm_volte_rx_device_mute_put),
+	SOC_SINGLE_EXT("VoLTE Tx Mute", SND_SOC_NOPM, 0, 1, 0,
+				msm_volte_mute_get, msm_volte_mute_put),
+	SOC_SINGLE_EXT("VoLTE Rx Volume", SND_SOC_NOPM, 0, 5, 0,
+				msm_volte_volume_get, msm_volte_volume_put),
+	SOC_SINGLE_EXT("Voice2 Rx Device Mute", SND_SOC_NOPM, 0, 1, 0,
+				msm_voice2_rx_device_mute_get,
+				msm_voice2_rx_device_mute_put),
+	SOC_SINGLE_EXT("Voice2 Tx Mute", SND_SOC_NOPM, 0, 1, 0,
+				msm_voice2_mute_get, msm_voice2_mute_put),
+	SOC_SINGLE_EXT("Voice2 Rx Volume", SND_SOC_NOPM, 0, 5, 0,
+				msm_voice2_volume_get, msm_voice2_volume_put),
+};
+
+//                                                                                 
+#elif defined(CONFIG_MACH_LGE_FX3_VZW) 
+static struct snd_kcontrol_new msm_voice_controls[] = {
+	SOC_SINGLE_EXT("Voice Rx Device Mute", SND_SOC_NOPM, 0, 1, 0,
+				msm_voice_rx_device_mute_get,
+				msm_voice_rx_device_mute_put),
+	SOC_SINGLE_EXT("Voice Tx Mute", SND_SOC_NOPM, 0, 1, 0,
+				msm_voice_mute_get, msm_voice_mute_put),
+	SOC_SINGLE_EXT("Voice Rx Volume", SND_SOC_NOPM, 0, 7, 0,
+				msm_voice_volume_get, msm_voice_volume_put),
+	SOC_ENUM_EXT("TTY Mode", msm_tty_mode_enum[0], msm_voice_tty_mode_get,
+				msm_voice_tty_mode_put),
+	SOC_SINGLE_EXT("Widevoice Enable", SND_SOC_NOPM, 0, 1, 0,
+			msm_voice_widevoice_get, msm_voice_widevoice_put),
+	SOC_SINGLE_EXT("Slowtalk Enable", SND_SOC_NOPM, 0, 1, 0,
+				msm_voice_slowtalk_get, msm_voice_slowtalk_put),
+	SOC_SINGLE_EXT("FENS Enable", SND_SOC_NOPM, 0, 1, 0,
+				msm_voice_fens_get, msm_voice_fens_put),
+	SOC_SINGLE_EXT("VoLTE Rx Device Mute", SND_SOC_NOPM, 0, 1, 0,
+			msm_volte_rx_device_mute_get,
+			msm_volte_rx_device_mute_put),
+	SOC_SINGLE_EXT("VoLTE Tx Mute", SND_SOC_NOPM, 0, 1, 0,
+				msm_volte_mute_get, msm_volte_mute_put),
+	SOC_SINGLE_EXT("VoLTE Rx Volume", SND_SOC_NOPM, 0, 5, 0,
+				msm_volte_volume_get, msm_volte_volume_put),
+	SOC_SINGLE_EXT("Voice2 Rx Device Mute", SND_SOC_NOPM, 0, 1, 0,
+				msm_voice2_rx_device_mute_get,
+				msm_voice2_rx_device_mute_put),
+	SOC_SINGLE_EXT("Voice2 Tx Mute", SND_SOC_NOPM, 0, 1, 0,
+				msm_voice2_mute_get, msm_voice2_mute_put),
+	SOC_SINGLE_EXT("Voice2 Rx Volume", SND_SOC_NOPM, 0, 5, 0,
+				msm_voice2_volume_get, msm_voice2_volume_put),
+};
+//                                                                                 
+//                                                                               
+#elif defined(CONFIG_MACH_LGE_FX3Q_TMUS) 
+static struct snd_kcontrol_new msm_voice_controls[] = {
+	SOC_SINGLE_EXT("Voice Rx Device Mute", SND_SOC_NOPM, 0, 1, 0,
+				msm_voice_rx_device_mute_get,
+				msm_voice_rx_device_mute_put),
+	SOC_SINGLE_EXT("Voice Tx Mute", SND_SOC_NOPM, 0, 1, 0,
+				msm_voice_mute_get, msm_voice_mute_put),
+	SOC_SINGLE_EXT("Voice Rx Volume", SND_SOC_NOPM, 0, 6, 0,
+				msm_voice_volume_get, msm_voice_volume_put),
+	SOC_ENUM_EXT("TTY Mode", msm_tty_mode_enum[0], msm_voice_tty_mode_get,
+				msm_voice_tty_mode_put),
+	SOC_SINGLE_EXT("Widevoice Enable", SND_SOC_NOPM, 0, 1, 0,
+			msm_voice_widevoice_get, msm_voice_widevoice_put),
+	SOC_SINGLE_EXT("Slowtalk Enable", SND_SOC_NOPM, 0, 1, 0,
+				msm_voice_slowtalk_get, msm_voice_slowtalk_put),
+	SOC_SINGLE_EXT("FENS Enable", SND_SOC_NOPM, 0, 1, 0,
+				msm_voice_fens_get, msm_voice_fens_put),
+	SOC_SINGLE_EXT("VoLTE Rx Device Mute", SND_SOC_NOPM, 0, 1, 0,
+			msm_volte_rx_device_mute_get,
+			msm_volte_rx_device_mute_put),
+	SOC_SINGLE_EXT("VoLTE Tx Mute", SND_SOC_NOPM, 0, 1, 0,
+				msm_volte_mute_get, msm_volte_mute_put),
+	SOC_SINGLE_EXT("VoLTE Rx Volume", SND_SOC_NOPM, 0, 5, 0,
+				msm_volte_volume_get, msm_volte_volume_put),
+	SOC_SINGLE_EXT("Voice2 Rx Device Mute", SND_SOC_NOPM, 0, 1, 0,
+				msm_voice2_rx_device_mute_get,
+				msm_voice2_rx_device_mute_put),
+	SOC_SINGLE_EXT("Voice2 Tx Mute", SND_SOC_NOPM, 0, 1, 0,
+				msm_voice2_mute_get, msm_voice2_mute_put),
+	SOC_SINGLE_EXT("Voice2 Rx Volume", SND_SOC_NOPM, 0, 5, 0,
+				msm_voice2_volume_get, msm_voice2_volume_put),
+};
+//                                                                               
+
+#else
 static struct snd_kcontrol_new msm_voice_controls[] = {
 	SOC_SINGLE_EXT("Voice Rx Device Mute", SND_SOC_NOPM, 0, 1, 0,
 				msm_voice_rx_device_mute_get,
@@ -574,6 +683,8 @@ static struct snd_kcontrol_new msm_voice_controls[] = {
 	SOC_SINGLE_EXT("Voice2 Rx Volume", SND_SOC_NOPM, 0, 5, 0,
 		       msm_voice2_volume_get, msm_voice2_volume_put),
 };
+#endif
+
 
 static struct snd_pcm_ops msm_pcm_ops = {
 	.open           = msm_pcm_open,

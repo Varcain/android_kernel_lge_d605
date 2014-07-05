@@ -509,7 +509,13 @@ struct platform_device msm8960_device_uart_gsbi5 = {
 };
 
 static struct msm_serial_hslite_platform_data uart_gsbi8_pdata = {
+//                                                                       
+#ifdef CONFIG_LGE_IRRC  // GSPAPA_IRRC
+	.line		= 1,  // GSPAPA_IRRC
+#else
 	.line		= 0,
+#endif
+//                                                                       
 };
 
 static struct resource resources_uart_gsbi8[] = {
@@ -1153,6 +1159,7 @@ struct msm_vidc_platform_data vidc_platform_data = {
 	.cont_mode_dpb_count = 18,
 	.fw_addr = 0x9fe00000,
 	.enable_sec_metadata = 0,
+	.vote_high_bw = 0,  /*                                                                                                       */
 };
 
 struct platform_device msm_device_vidc = {
@@ -1717,12 +1724,21 @@ struct platform_device msm8960_cpu_slp_status = {
 	},
 };
 
+#if defined(CONFIG_MACH_LGE_L9II_COMMON) || defined(CONFIG_MACH_LGE_FX3Q_TMUS)
+static struct msm_watchdog_pdata msm_watchdog_pdata = {
+	.pet_time = 10000,
+	.bark_time = 15000,
+	.has_secure = true,
+	.base = MSM_TMR0_BASE + WDT0_OFFSET,
+};
+#else
 static struct msm_watchdog_pdata msm_watchdog_pdata = {
 	.pet_time = 10000,
 	.bark_time = 11000,
 	.has_secure = true,
 	.base = MSM_TMR0_BASE + WDT0_OFFSET,
 };
+#endif
 
 static struct resource msm_watchdog_resources[] = {
 	{
@@ -1788,6 +1804,37 @@ int __init msm_add_sdcc(unsigned int controller, struct mmc_platform_data *plat)
 	pdev->dev.platform_data = plat;
 	return platform_device_register(pdev);
 }
+
+/*            */
+#ifdef CONFIG_MACH_MSM8930_FX3
+static struct resource resources_qup_i2c_gsbi2[] = {
+	{
+		.name	= "gsbi_qup_i2c_addr",
+		.start	= MSM_GSBI2_PHYS,
+		.end	= MSM_GSBI2_PHYS + 4 - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "qup_phys_addr",
+		.start	= MSM_GSBI2_QUP_PHYS,
+		.end	= MSM_GSBI2_QUP_PHYS + MSM_QUP_SIZE - 1,
+		.flags	= IORESOURCE_MEM,
+	},
+	{
+		.name	= "qup_err_intr",
+		.start	= GSBI2_QUP_IRQ,
+		.end	= GSBI2_QUP_IRQ,
+		.flags	= IORESOURCE_IRQ,
+	},
+};
+
+struct platform_device msm8960_device_qup_i2c_gsbi2 = {
+	.name		= "qup_i2c",
+	.id		= 2,
+	.num_resources	= ARRAY_SIZE(resources_qup_i2c_gsbi2),
+	.resource	= resources_qup_i2c_gsbi2,
+};
+#endif
 
 static struct resource resources_qup_i2c_gsbi4[] = {
 	{
@@ -2397,6 +2444,27 @@ struct platform_device msm8960_cpudai_slimbus_2_tx = {
 	.id = 0x4005,
 };
 
+#ifdef CONFIG_FM_RADIO_MI2S_ENABLE
+struct platform_device msm8960_cpudai_slimbus_1_tx = {
+	.name = "msm-dai-q6",
+	.id = 0x4003,
+};
+struct platform_device msm8960_cpudai_slimbus_3_rx = {
+	.name = "msm-dai-q6",
+	.id = 0x4006,
+};
+struct msm_mi2s_pdata mi2s_data = {
+	.rx_sd_lines = 0 ,
+	.tx_sd_lines = MSM_MI2S_SD0 ,   /* sd0 */
+};
+struct platform_device msm_cpudai_mi2s = {
+	.name	= "msm-dai-q6-mi2s",
+	.id	= -1,
+	.dev = {
+		.platform_data = &mi2s_data,
+	},
+};
+#endif
 struct platform_device msm_cpudai_hdmi_rx = {
 	.name	= "msm-dai-q6-hdmi",
 	.id	= 8,
@@ -2441,27 +2509,30 @@ struct platform_device msm_cpudai_incall_record_tx = {
  * Machine specific data for AUX PCM Interface
  * which the driver will  be unware of.
  */
+/*            */
+//                        
 struct msm_dai_auxpcm_pdata auxpcm_pdata = {
 	.clk = "pcm_clk",
 	.mode_8k = {
 		.mode = AFE_PCM_CFG_MODE_PCM,
 		.sync = AFE_PCM_CFG_SYNC_INT,
-		.frame = AFE_PCM_CFG_FRM_32BPF,
+		.frame = AFE_PCM_CFG_FRM_256BPF,
 		.quant = AFE_PCM_CFG_QUANT_LINEAR_NOPAD,
 		.slot = 0,
 		.data = AFE_PCM_CFG_CDATAOE_MASTER,
-		.pcm_clk_rate = 256000,
+		.pcm_clk_rate = 2048000,
 	},
 	.mode_16k = {
 		.mode = AFE_PCM_CFG_MODE_PCM,
 		.sync = AFE_PCM_CFG_SYNC_INT,
-		.frame = AFE_PCM_CFG_FRM_32BPF,
+		.frame = AFE_PCM_CFG_FRM_256BPF,
 		.quant = AFE_PCM_CFG_QUANT_LINEAR_NOPAD,
 		.slot = 0,
 		.data = AFE_PCM_CFG_CDATAOE_MASTER,
-		.pcm_clk_rate = 512000,
+		.pcm_clk_rate = 4096000,
 	}
 };
+//                       
 
 struct platform_device msm_cpudai_auxpcm_rx = {
 	.name = "msm-dai-q6",

@@ -35,6 +35,16 @@ static long msm_server_send_v4l2_evt(void *evt);
 static void msm_cam_server_subdev_notify(struct v4l2_subdev *sd,
 	unsigned int notification, void *arg);
 
+/*                                                                   */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+static int task_free_notify_func(struct notifier_block *self, unsigned long val, void *data);
+static int wait_for_exit_prev_task(void);
+static struct notifier_block task_free_nb = {
+	.notifier_call  = task_free_notify_func,
+};
+#endif
+/*                                                                 */
+
 void msm_queue_init(struct msm_device_queue *queue, const char *name)
 {
 	D("%s\n", __func__);
@@ -76,8 +86,14 @@ void msm_drain_eventq(struct msm_device_queue *queue)
 		isp_event =
 			(struct msm_isp_event_ctrl *)
 			qcmd->command;
-		if (isp_event->isp_data.ctrl.value != NULL)
-			kfree(isp_event->isp_data.ctrl.value);
+		//                                                                                            
+		if( isp_event->resptype == MSM_CAM_RESP_V4L2 )
+		{
+			if (isp_event->isp_data.ctrl.value != NULL) {
+				kfree(isp_event->isp_data.ctrl.value);
+			}
+		}
+		//                                                                                          
 		kfree(qcmd->command);
 		free_qcmd(qcmd);
 	}
@@ -367,6 +383,51 @@ command_alloc_fail:
 	return -EINVAL;
 }
 
+//                                                                                          
+void msm_cam_stop_hardware(struct msm_cam_v4l2_device *pcam)
+{
+	struct msm_cam_media_controller *pmctl;
+//	int rc = 0;
+	printk("%s: E\n", __func__);
+	pr_err("%s: stopping hardware upon error\n", __func__);
+	if (pcam == NULL)
+	{
+		printk("[pcam == NULL] return\n");
+	    return;
+	}
+	else
+	{
+		printk("[pcam != NULL] Do not return\n");
+	}
+
+/*                                                                              */
+	//mutex_lock(&pcam->vid_lock);
+/*                                                                              */
+	pmctl = msm_cam_server_get_mctl(pcam->mctl_handle);
+
+	if(pmctl != NULL){ /*                                                                                                                 */
+		if (pmctl && pmctl->mctl_release) {
+			pr_err("%s: stopping hardware upon error\n", __func__);
+	//                                                                         
+			/*do not send any commands to hardware after reaching this point*/
+			pr_err("%s: set mctl_cmd NULL\n", __func__);
+			pmctl->mctl_cmd = NULL;
+	//                                                                        
+			if(pmctl->mctl_release)
+				pmctl->mctl_release(pmctl);
+			pmctl->mctl_release = NULL;
+	/*                                                                              */
+		} else {
+				pr_err("%s: pmctl %p, pmctl->mctl_release %p\n", __func__, pmctl, pmctl->mctl_release);
+		}
+	} else {
+		pr_err("%s: pmctl is NULL",__func__); /*                                                                                                                 */
+	}
+	//mutex_unlock(&pcam->vid_lock);
+/*                                                                              */
+	printk("%s: X\n", __func__);
+}
+//                                                                                        
 /* send control command to config and wait for results*/
 static int msm_server_control(struct msm_cam_server_dev *server_dev,
 				uint32_t id, struct msm_ctrl_cmd *out)
@@ -379,6 +440,10 @@ static int msm_server_control(struct msm_cam_server_dev *server_dev,
 	struct msm_ctrl_cmd *ctrlcmd;
 	struct msm_device_queue *queue =
 		&server_dev->server_queue[out->queue_idx].ctrl_q;
+
+	//                                                                                          
+	struct msm_cam_v4l2_device *pcam = server_dev->pcam_active[0];
+	//                                                                                        
 
 	struct v4l2_event v4l2_evt;
 	struct msm_isp_event_ctrl *isp_event;
@@ -465,6 +530,28 @@ static int msm_server_control(struct msm_cam_server_dev *server_dev,
 			if (++server_dev->server_evt_id == 0)
 				server_dev->server_evt_id++;
 			pr_err("%s: wait_event error %d\n", __func__, rc);
+
+//                                                                                          
+		if (pcam) {
+			pr_err("%s: %d: Calling msm_cam_stop_hardware.\n", __func__, __LINE__);
+/*                                                                                   */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+#else
+				msm_cam_stop_hardware(pcam);
+#endif
+/*                                                                                   */
+			}else{
+				pr_err("%s: %d: pcam instanstance was NULL.\n", __func__, __LINE__);
+			}
+//                                                                                        
+/*                                                                   */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GK_KR) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+			//kill camera daemon client aka mediaserver
+			if (!(current->flags & PF_EXITING))
+				send_sig(SIGKILL, current, 0);
+#endif
+/*                                                                 */
+
 			return rc;
 		} else {
 			pr_err("%s: List is empty\n", __func__);
@@ -597,6 +684,9 @@ int msm_send_open_server(struct msm_cam_v4l2_device *pcam)
 	int rc = 0;
 	struct msm_ctrl_cmd ctrlcmd;
 	int idx = pcam->server_queue_idx;
+//                                                                     
+	printk("%s: E\n", __func__);
+//                                                                     
 	D("%s qid %d\n", __func__, pcam->server_queue_idx);
 	ctrlcmd.type	   = MSM_V4L2_OPEN;
 	ctrlcmd.timeout_ms = 10000;
@@ -610,7 +700,9 @@ int msm_send_open_server(struct msm_cam_v4l2_device *pcam)
 
 	/* send command to config thread in usersspace, and get return value */
 	rc = msm_server_control(&g_server_dev, 0, &ctrlcmd);
-
+//                                                                     
+	printk("%s: X\n", __func__);
+//                                                                     
 	return rc;
 }
 
@@ -618,6 +710,9 @@ int msm_send_close_server(struct msm_cam_v4l2_device *pcam)
 {
 	int rc = 0;
 	struct msm_ctrl_cmd ctrlcmd;
+//                                                                     
+	printk("%s: E\n", __func__);
+//                                                                     
 	D("%s qid %d\n", __func__, pcam->server_queue_idx);
 	ctrlcmd.type	   = MSM_V4L2_CLOSE;
 	ctrlcmd.timeout_ms = 10000;
@@ -632,6 +727,9 @@ int msm_send_close_server(struct msm_cam_v4l2_device *pcam)
 
 	/* send command to config thread in usersspace, and get return value */
 	rc = msm_server_control(&g_server_dev, 0, &ctrlcmd);
+//                                                                     
+	printk("%s: X\n", __func__);
+//                                                                     
 
 	return rc;
 }
@@ -907,7 +1005,15 @@ int msm_server_s_ctrl(struct msm_cam_v4l2_device *pcam,
 	ctrlcmd.length = sizeof(struct v4l2_control);
 	ctrlcmd.value = (void *)ctrl_data;
 	memcpy(ctrlcmd.value, ctrl, ctrlcmd.length);
+/*                                                                    */
+#if defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) \
+	|| defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined(CONFIG_MACH_APQ8064_GVDCM) \
+	|| defined(CONFIG_MACH_LGE_L9II_COMMON)
+	ctrlcmd.timeout_ms = 3000;
+#else
 	ctrlcmd.timeout_ms = 1000;
+#endif
+/*                                                                  */
 	ctrlcmd.vnode_id = pcam->vnode_id;
 	ctrlcmd.queue_idx = pcam->server_queue_idx;
 	ctrlcmd.config_ident = g_server_dev.config_info.config_dev_id[0];
@@ -1474,14 +1580,54 @@ static int msm_open_server(struct file *fp)
 {
 	int rc = 0;
 	D("%s: open %s\n", __func__, fp->f_path.dentry->d_name.name);
+
+/*                                                                   */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+	if(wait_for_exit_prev_task() != 0)
+		return -EBUSY;
+#endif
+/*                                                                 */
+
 	mutex_lock(&g_server_dev.server_lock);
 	g_server_dev.use_count++;
+
+	/*                                                       */
+	pr_err("%s use_count : %d\n", __func__, g_server_dev.use_count);
+	
+/*                                                                                         */
+#if defined(CONFIG_MACH_LGE_F6_TMUS) || defined(CONFIG_MACH_LGE_FX3Q_TMUS)
+	if (g_server_dev.use_count == 1)	{
+		fp->private_data =
+		&g_server_dev.server_command_queue.eventHandle; 
+	}	else if (g_server_dev.use_count > 1 )	{
+		printk(KERN_INFO "JASON : msm_open_server called more than once. Dump Stack\n");
+		dump_stack();
+		g_server_dev.use_count--;
+		mutex_unlock(&g_server_dev.server_lock);
+		return -ENODEV;
+	}
+	mutex_unlock(&g_server_dev.server_lock);
+	return rc;
+#else
+/*                                                                                         */
 	if (g_server_dev.use_count == 1)
 		fp->private_data =
 			&g_server_dev.server_command_queue.eventHandle;
 	mutex_unlock(&g_server_dev.server_lock);
 	return rc;
+#endif
 }
+
+/*                                                                              */
+int get_server_use_count(void)
+{
+	int server_count;
+	mutex_lock(&g_server_dev.server_lock);
+	server_count = g_server_dev.use_count;
+	mutex_unlock(&g_server_dev.server_lock);
+	return server_count;
+}
+/*                                                                              */
 
 static int msm_close_server(struct file *fp)
 {
@@ -1490,11 +1636,14 @@ static int msm_close_server(struct file *fp)
 	mutex_lock(&g_server_dev.server_lock);
 	if (g_server_dev.use_count > 0)
 		g_server_dev.use_count--;
-	mutex_unlock(&g_server_dev.server_lock);
+	//                                                                                                                 
+
+	/*                                                       */
+	pr_err("%s use_count : %d\n", __func__, g_server_dev.use_count);
 
 	if (g_server_dev.use_count == 0) {
 		int i;
-		mutex_lock(&g_server_dev.server_lock);
+		//                                                                                                               
 		for (i = 0; i < MAX_NUM_ACTIVE_CAMERA; i++) {
 			if (g_server_dev.pcam_active[i]) {
 				struct msm_cam_media_controller *pmctl = NULL;
@@ -1517,6 +1666,7 @@ static int msm_close_server(struct file *fp)
 			&g_server_dev.server_command_queue.eventHandle, &sub);
 		mutex_unlock(&g_server_dev.server_lock);
 	}
+	mutex_unlock(&g_server_dev.server_lock);	/*                                                                    */
 	return 0;
 }
 
@@ -2842,7 +2992,14 @@ static int msm_open_config(struct inode *inode, struct file *fp)
 
 	config_cam->p_mctl->config_device = config_cam;
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+/*                                                                  */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+	config_cam->pcam = g_server_dev.pcam_active[config_cam->dev_num];
+	msm_camera_v4l2_get_ion_client(config_cam->pcam);
+#else
 	kref_get(&config_cam->p_mctl->refcount);
+#endif
+/*                                                                */
 #endif
 	fp->private_data = config_cam;
 	return rc;
@@ -3134,7 +3291,13 @@ static int msm_close_config(struct inode *node, struct file *f)
 
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 	D("%s Decrementing ref count of config node ", __func__);
+/*                                                                  */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+	msm_camera_v4l2_put_ion_client(config_cam->pcam);
+#else
 	kref_put(&config_cam->p_mctl->refcount, msm_release_ion_client);
+#endif
+/*                                                                */
 #endif
 	sub.type = V4L2_EVENT_ALL;
 	msm_server_v4l2_unsubscribe_event(
@@ -3257,7 +3420,14 @@ static int __devinit msm_camera_probe(struct platform_device *pdev)
 			return rc;
 		}
 	}
-
+/*                                                                   */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+	task_free_register(&task_free_nb);
+	init_waitqueue_head(&g_server_dev.ft_wq);
+	g_server_dev.wait_ft_timeout = msecs_to_jiffies(2500); //2500ms
+	spin_lock_init(&g_server_dev.ft_spin);
+#endif
+/*                                                                 */
 	return rc;
 }
 
@@ -3265,6 +3435,89 @@ static int __exit msm_camera_exit(struct platform_device *pdev)
 {
 	return 0;
 }
+
+/*                                                                   */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+static struct task_struct *get_server_prev_task(void)
+{
+	struct task_struct *prev_task;
+	unsigned long flags = 0;
+	spin_lock_irqsave(&g_server_dev.ft_spin, flags);
+	prev_task = g_server_dev.prev_task;
+	spin_unlock_irqrestore(&g_server_dev.ft_spin, flags);
+	return prev_task;
+}
+
+static void set_server_prev_task(struct task_struct *prev_task)
+{
+	unsigned long flags = 0;
+	spin_lock_irqsave(&g_server_dev.ft_spin, flags);
+	g_server_dev.prev_task = prev_task;
+	spin_unlock_irqrestore(&g_server_dev.ft_spin, flags);
+}
+
+static int task_free_notify_func(struct notifier_block *self, unsigned long val, void *data)
+{
+	struct task_struct *task = data;
+	unsigned long flags = 0;
+
+	spin_lock_irqsave(&g_server_dev.ft_spin, flags);
+
+	if (task == g_server_dev.prev_task)
+	{
+		g_server_dev.prev_task = NULL;
+		wake_up_interruptible(&g_server_dev.ft_wq);
+	}
+	spin_unlock_irqrestore(&g_server_dev.ft_spin, flags);
+	return NOTIFY_OK;
+}
+
+static int wait_for_exit_prev_task(void)
+{
+	int loop_count = 0, rc = -ETIMEDOUT;
+
+	if(get_server_prev_task() == current->group_leader)
+		return 0;
+	else
+	{
+		do{
+			if((rc = wait_event_interruptible_timeout(g_server_dev.ft_wq,
+				(get_server_prev_task() == NULL),
+				g_server_dev.wait_ft_timeout)) > 0)
+				break;
+			if (rc == 0)
+				printk(KERN_DEBUG "%s (%d): fail to wait for task free - count : %d, %s, pid = %d\n",
+					__func__, __LINE__,
+					g_server_dev.use_count,
+					current->comm,
+					current->pid);
+			else
+				return -EBUSY; //signal
+		}while(++loop_count < 12); //30secs
+	}
+
+	if(get_server_prev_task() == NULL)
+	{
+		loop_count = 0;
+		do{
+			if(get_server_use_count() == 0)
+			{
+				set_server_prev_task(current->group_leader);
+				return 0;
+			}
+			printk(KERN_DEBUG "%s (%d): fail to wait for task free - count : %d, %s, pid = %d\n",
+				__func__, __LINE__,
+				g_server_dev.use_count,
+				current->comm,
+				current->pid);
+			msleep(g_server_dev.wait_ft_timeout);
+		}while(++loop_count < 12); //30secs
+	}
+
+	return -EBUSY;
+}
+#endif
+/*                                                                 */
 
 static const struct of_device_id msm_cam_server_dt_match[] = {
 	{.compatible = "qcom,cam_server"},

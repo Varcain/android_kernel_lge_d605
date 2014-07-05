@@ -38,6 +38,10 @@ enum pm8xxx_leds {
 	PM8XXX_ID_RGB_LED_RED,
 	PM8XXX_ID_RGB_LED_GREEN,
 	PM8XXX_ID_RGB_LED_BLUE,
+#if defined(CONFIG_MACH_MSM8930_LGPS9) || defined(CONFIG_MACH_MSM8930_FX3)
+	PM8XXX_ID_MPP_KB_LIGHT,
+	PM8XXX_ID_MPP_QWERTY,
+#endif
 	PM8XXX_ID_MAX,
 };
 
@@ -72,7 +76,11 @@ enum wled_ovp_threshold {
 	WLED_OVP_35V,
 	WLED_OVP_32V,
 	WLED_OVP_29V,
+#if defined (CONFIG_FB_MSM_MIPI_TX11D108VM_R69324A_VIDEO_QHD_PT) || defined(CONFIG_MACH_LGE_FX3_VZW) || defined(CONFIG_MACH_LGE_FX3Q_TMUS) //compile error.
+	WLED_OVP_37V,
+#else
 	WLED_OVP_27V,
+#endif
 };
 
 /**

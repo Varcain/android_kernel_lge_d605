@@ -1371,6 +1371,12 @@ exit:
 				&driver->smd_data[i].nrt_lock);
 	}
 	mutex_unlock(&driver->diagchar_mutex);
+
+#ifdef CONFIG_USB_LGE_ANDROID_DIAG_OSP_SUPPORT
+	driver->diag_read_status = 1;
+	wake_up_interruptible(&driver->diag_read_wait_q);
+#endif
+
 	return ret;
 }
 

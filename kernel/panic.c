@@ -109,8 +109,8 @@ void panic(const char *fmt, ...)
 	vsnprintf(buf, sizeof(buf), fmt, args);
 	va_end(args);
 #ifdef CONFIG_LGE_CRASH_HANDLER
-	set_kernel_crash_magic_number();
 	set_crash_store_enable();
+	lge_set_kernel_crash_magic();
 #endif
 	printk(KERN_EMERG "Kernel panic - not syncing: %s\n",buf);
 #ifdef CONFIG_LGE_CRASH_HANDLER

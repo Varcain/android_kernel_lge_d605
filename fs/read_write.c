@@ -374,6 +374,7 @@ ssize_t vfs_read(struct file *file, char __user *buf, size_t count, loff_t *pos)
 
 	ret = rw_verify_area(READ, file, pos, count);
 	if (ret >= 0) {
+
 		count = ret;
 		if (file->f_op->read)
 			ret = file->f_op->read(file, buf, count, pos);

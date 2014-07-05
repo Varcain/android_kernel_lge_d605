@@ -911,6 +911,7 @@ config MACH_MSM_DUMMY
 
 endmenu
 
+# LGE_CHANGE
 source "arch/arm/mach-msm/lge/Kconfig"
 
 config MSM_STACKED_MEMORY
@@ -2639,5 +2640,11 @@ config MSM_CPU_PWRCTL
 	  Droop detector mechanism can adversely affect krait plls during
 	  stand alone power collapse operation. Selecting this option
 	  ensures that they are always off.
+
+config FM_RADIO_MI2S_ENABLE
+	bool "Support MI2S for BCM FM RADIO"
+    default n
+    help
+    	Support MI2S for 3rd Party BCM4334 FM RADIO
 
 endif

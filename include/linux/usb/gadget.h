@@ -712,6 +712,10 @@ static inline int usb_gadget_vbus_draw(struct usb_gadget *gadget, unsigned mA)
 {
 	if (!gadget->ops->vbus_draw)
 		return -EOPNOTSUPP;
+
+	printk("[USB : %s : %d][%d]\n", __func__, __LINE__, mA);
+	//WARN(1,"[USB : %s : %d][%d]\n", __func__, __LINE__, mA);
+
 	return gadget->ops->vbus_draw(gadget, mA);
 }
 

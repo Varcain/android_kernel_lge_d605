@@ -1042,8 +1042,33 @@ static int mtp_ctrlrequest(struct usb_composite_dev *cdev,
 		DBG(cdev, "class request: %d index: %d value: %d length: %d\n",
 			ctrl->bRequest, w_index, w_value, w_length);
 
+
+#ifdef CONFIG_USB_LGE_ANDROID
+		/* Fix Windows 7 Bug at PCSync
+		 * In mtp usb request, MTP_REQ_CANCEL and MTP_REQ_GET_DEVICE_STATUS has w_index(USB interface number) parameter.
+		 * In Windows XP, this w_index is hardcoded to 0,
+		 * but in Windows 7, this w_index is refered to interface number of mtp.
+		 * So add w_index as interface number(is 3) of mtp using LG United Driver.
+
+		 - Windows XP
+		 MTP only mode : MTP_REQ_CANCEL(0x64), w_index = 0, w_value = 0;
+		 PC suite mode   : MTP_REQ_CANCEL(0x64), w_index = 0, w_value = 0;
+		 MTP only mode : MTP_REQ_GET_DEVICE_STATUS(0x67), w_index = 0, w_value = 0;
+		 PC suite mode   : MTP_REQ_GET_DEVICE_STATUS(0x67), w_index = 0, w_value = 0;
+
+		 - Windows 7
+		 MTP only mode : MTP_REQ_CANCEL(0x64), w_index = 0, w_value = 0;
+		 PC suite mode   : MTP_REQ_CANCEL(0x64), w_index = 3, w_value = 0;
+		 MTP only mode : MTP_REQ_GET_DEVICE_STATUS(0x67), w_index = 0, w_value = 0;
+		 PC suite mode   : MTP_REQ_GET_DEVICE_STATUS(0x67), w_index = 3, w_value = 0;
+		 */
+
+		if (ctrl->bRequest == MTP_REQ_CANCEL && (w_index == 0 || w_index == 3)
+				&& w_value == 0) {
+#else /* google original */
 		if (ctrl->bRequest == MTP_REQ_CANCEL && w_index == 0
 				&& w_value == 0) {
+#endif
 			DBG(cdev, "MTP_REQ_CANCEL\n");
 
 			spin_lock_irqsave(&dev->lock, flags);
@@ -1059,8 +1084,13 @@ static int mtp_ctrlrequest(struct usb_composite_dev *cdev,
 			 * the contents.
 			 */
 			value = w_length;
+#ifdef CONFIG_USB_LGE_ANDROID
+		} else if (ctrl->bRequest == MTP_REQ_GET_DEVICE_STATUS
+				&& (w_index == 0 || w_index == 3) && w_value == 0) {
+#else /* google original */
 		} else if (ctrl->bRequest == MTP_REQ_GET_DEVICE_STATUS
 				&& w_index == 0 && w_value == 0) {
+#endif
 			struct mtp_device_status *status = cdev->req->buf;
 			status->wLength =
 				__constant_cpu_to_le16(sizeof(*status));
@@ -1109,7 +1139,11 @@ mtp_function_bind(struct usb_configuration *c, struct usb_function *f)
 	if (id < 0)
 		return id;
 	mtp_interface_desc.bInterfaceNumber = id;
+#ifdef CONFIG_USB_LGE_ANDROID
+	/* for ptp & MS desc */
+	ptp_interface_desc.bInterfaceNumber = id;
 	mtp_ext_config_desc.function.bFirstInterfaceNumber = id;
+#endif
 
 	/* allocate endpoints */
 	ret = mtp_create_bulk_endpoints(dev, &mtp_fullspeed_in_desc,

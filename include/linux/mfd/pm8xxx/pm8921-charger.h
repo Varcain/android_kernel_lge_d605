@@ -56,6 +56,18 @@ enum pm8921_chg_led_src_config {
 	LED_SRC_BYPASS,
 };
 
+/*           
+                                    
+                                
+*/
+
+typedef enum{
+	IUSB_REDUCE_METHOD = 0,
+	IUSB_USE_FOR_ISYSTEM_METHOD,
+	IUSB_NORMAL_METHOD,
+} xo_mitigation_way;
+/*                               */
+
 /**
  * struct pm8921_charger_platform_data -
  *			valid range 4 to 512 min. PON default 120 min
@@ -178,8 +190,21 @@ struct pm8921_charger_platform_data {
 	int				vin_min;
 	int				*thermal_mitigation;
 	int				thermal_levels;
+#ifdef CONFIG_LGE_CHARGER_TEMP_SCENARIO
+	/*           
+                                    
+                                
+*/
+	xo_mitigation_way thermal_mitigation_method;
+/*                               */
+#endif
+/*                                       */
 	enum pm8921_chg_cold_thr	cold_thr;
 	enum pm8921_chg_hot_thr		hot_thr;
+#ifdef CONFIG_MACH_LGE
+	int batt_id_gpio;			/* No. of msm gpio for battery id */
+	int batt_id_pu_gpio;		/* No. of msm gpio for battery id pull up */
+#endif
 	int				rconn_mohm;
 	enum pm8921_chg_led_src_config	led_src_config;
 	int				battery_less_hardware;
@@ -188,6 +213,13 @@ struct pm8921_charger_platform_data {
 	int				btc_override_hot_degc;
 	int				btc_delay_ms;
 	int				btc_panic_if_cant_stop_chg;
+#ifdef CONFIG_MACH_MSM8930_FX3
+	bool				aicl;
+#endif
+#ifdef CONFIG_LGE_PM_BOOST_IC
+	unsigned int boost_byp_sw_gpio;
+	unsigned int boost_byp_thr;
+#endif /*                        */
 	int				stop_chg_upon_expiry;
 	bool				disable_chg_rmvl_wrkarnd;
 	bool				enable_tcxo_warmup_delay;
@@ -203,6 +235,31 @@ enum pm8921_charger_source {
 void pm8921_charger_vbus_draw(unsigned int mA);
 int pm8921_charger_register_vbus_sn(void (*callback)(int));
 void pm8921_charger_unregister_vbus_sn(void (*callback)(int));
+/*                                                          */
+#ifdef CONFIG_LGE_PM
+extern int pm8921_charger_is_ta_connected(void);
+#ifdef CONFIG_LGE_PM_VZW_FAST_CHG
+extern void set_vzw_charging_state(void);
+#endif
+#ifdef CONFIG_MACH_LGE_FX3Q_TMUS
+extern bool is_finished_to_check_open_ta;
+#endif
+#ifdef CONFIG_LGE_PM_TRKLCHG_IN_KERNEL
+extern int usb_dc_mA_in_sdp;
+extern bool trklchg_current_enable_flag;
+#endif
+#endif
+
+/*                          */
+/**
+ * pm8921_charger_enable -
+ *
+ * @enable: 1 means enable charging, 0 means disable
+ *
+ * Enable/Disable battery charging current, the device will still draw current
+ * from the charging source
+ */
+int pm8921_charger_enable(bool enable);
 
 /**
  * pm8921_is_usb_chg_plugged_in - is usb plugged in
@@ -310,6 +367,10 @@ int pm8921_usb_ovp_set_hystersis(enum pm8921_usb_debounce_time ms);
  *
  */
 int pm8921_usb_ovp_disable(int disable);
+#ifdef CONFIG_LGE_PM
+void pm8921_charger_force_update_batt_psy(void);
+#endif
+
 /**
  * pm8921_is_batfet_closed - battery fet status
  *
@@ -373,6 +434,11 @@ static inline int pm8921_batt_temperature(void)
 {
 	return -ENXIO;
 }
+#ifdef CONFIG_LGE_PM
+static inline void pm8921_charger_force_update_batt_psy(void)
+{
+}
+#endif
 static inline int pm8921_usb_ovp_set_threshold(enum pm8921_usb_ov_threshold ov)
 {
 	return -ENXIO;

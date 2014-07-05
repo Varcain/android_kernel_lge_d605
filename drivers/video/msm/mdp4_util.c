@@ -468,6 +468,12 @@ void mdp4_hw_init(void)
 	/* MDP cmd block disable */
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
 	mdp_clk_ctrl(0);
+//                                                                     
+#ifdef CSC_RESTORE
+	if(csc_dmap_changed)
+		mdp4_csc_config(&csc_cfg_backup_matrix);
+#endif
+//                                               
 }
 
 

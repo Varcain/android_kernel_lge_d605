@@ -648,6 +648,7 @@ static void msm_mctl_release(struct msm_cam_media_controller *p_mctl)
 	struct msm_sensor_ctrl_t *s_ctrl = get_sctrl(p_mctl->sensor_sdev);
 	struct msm_camera_sensor_info *sinfo =
 		(struct msm_camera_sensor_info *) s_ctrl->sensordata;
+	pr_err("%s called\n", __func__); /*                                                                            */
 	mutex_lock(&p_mctl->lock);
 	if (p_mctl->opencnt) {
 		v4l2_subdev_call(p_mctl->sensor_sdev, core, ioctl,
@@ -669,6 +670,21 @@ static void msm_mctl_release(struct msm_cam_media_controller *p_mctl)
 				VIDIOC_MSM_AXI_RELEASE, NULL);
 		}
 
+/*                                                                                                            */
+#ifndef CONFIG_MACH_MSM8930_FX3
+		if (p_mctl->csid_sdev) {
+			v4l2_subdev_call(p_mctl->csid_sdev, core, ioctl,
+				VIDIOC_MSM_CSID_RELEASE, NULL);
+		}
+
+		if (p_mctl->csiphy_sdev) {
+			v4l2_subdev_call(p_mctl->csiphy_sdev, core, ioctl,
+				VIDIOC_MSM_CSIPHY_RELEASE,
+				sinfo->sensor_platform_info->csi_lane_params);
+		}
+#else
+		pr_err("%s Release and swapping the csi init order\n", __func__);
+	
 		if (p_mctl->csiphy_sdev) {
 			v4l2_subdev_call(p_mctl->csiphy_sdev, core, ioctl,
 				VIDIOC_MSM_CSIPHY_RELEASE,
@@ -679,6 +695,8 @@ static void msm_mctl_release(struct msm_cam_media_controller *p_mctl)
 			v4l2_subdev_call(p_mctl->csid_sdev, core, ioctl,
 				VIDIOC_MSM_CSID_RELEASE, NULL);
 		}
+#endif
+/*                                                                                                             */
 
 		if (p_mctl->act_sdev) {
 			v4l2_subdev_call(p_mctl->act_sdev, core, s_power, 0);
@@ -686,6 +704,8 @@ static void msm_mctl_release(struct msm_cam_media_controller *p_mctl)
 		}
 
 		v4l2_subdev_call(p_mctl->sensor_sdev, core, s_power, 0);
+	pr_err("%s called X\n", __func__); /*                                                                            */
+	p_mctl->hardware_running = 0; /*                                                                            */
 
 		v4l2_subdev_call(p_mctl->ispif_sdev,
 				core, ioctl, VIDIOC_MSM_ISPIF_REL, NULL);
@@ -802,14 +822,18 @@ int msm_mctl_init(struct msm_cam_v4l2_device *pcam)
 	pmctl->sensor_sdev = pcam->sensor_sdev;
 	pmctl->sdata = pcam->sdata;
 	v4l2_set_subdev_hostdata(pcam->sensor_sdev, pmctl);
-
+/*                                                                  */
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+	pmctl->client = msm_camera_v4l2_get_ion_client(pcam);
+#else		
 	if (!pmctl->client) {
 		pmctl->client = msm_ion_client_create(-1, "camera");
 		kref_init(&pmctl->refcount);
 	}
 #endif
-
+#endif
+/*                                                                */
 	return 0;
 }
 
@@ -824,7 +848,13 @@ int msm_mctl_free(struct msm_cam_v4l2_device *pcam)
 		pr_err("%s: invalid mctl controller", __func__);
 		return -EINVAL;
 	}
-
+/*                                                                  */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+    msm_camera_v4l2_put_ion_client(pcam);
+#endif
+#endif
+/*                                                                */
 	mutex_destroy(&pmctl->lock);
 	wake_lock_destroy(&pmctl->wake_lock);
 	/*clear out mctl fields*/
@@ -901,7 +931,15 @@ static int msm_mctl_dev_open(struct file *f)
 			pcam->mctl_node.pvdev);
 
 	pcam_inst->vbqueue_initialized = 0;
+/*                                                                  */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+	pmctl->client = msm_camera_v4l2_get_ion_client(pcam);
+#endif
+#else
 	kref_get(&pmctl->refcount);
+#endif
+/*                                                                */
 	f->private_data = &pcam_inst->eventHandle;
 
 	D("f->private_data = 0x%x, pcam = 0x%x\n",
@@ -966,6 +1004,12 @@ static int msm_mctl_dev_close(struct file *f)
 	pmctl = msm_cam_server_get_mctl(pcam->mctl_handle);
 	mutex_lock(&pcam->mctl_node.dev_lock);
 	mutex_lock(&pcam_inst->inst_lock);
+/*                                                                  */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)	
+	if (pcam_inst->vbqueue_initialized)
+		vb2_queue_release(&pcam_inst->vid_bufq);	
+#endif
+/*                                                                */
 	D("%s : active %d ", __func__, pcam->mctl_node.active);
 	if (pcam->mctl_node.active == 1) {
 		rc = msm_cam_server_close_mctl_session(pcam);

@@ -275,6 +275,11 @@ static void pet_watchdog_work(struct work_struct *work)
 {
 	pet_watchdog();
 
+/*            */
+#ifdef CONFIG_MACH_LGE
+    printk("[%s]\n", __func__);
+#endif
+
 	if (enable)
 		schedule_delayed_work_on(0, &dogwork_struct, delay_time);
 }

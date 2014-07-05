@@ -37,7 +37,10 @@
 #include <linux/poll.h>
 #include <linux/version.h>
 
-#include <linux/nfc/bcm2079x.h>
+/*            */
+//include <linux/nfc/bcm20779x.h>
+#include <linux/nfc/bcm43341.h>		//                  
+#include <linux/wakelock.h>
 
 /* do not change below */
 #define MAX_BUFFER_SIZE		780
@@ -60,7 +63,12 @@ struct bcm2079x_dev {
 	bool irq_enabled;
 	spinlock_t irq_enabled_lock;
 	unsigned int count_irq;
+/*            */
+    bool irq_wake_enabled;	//hyunho.koh
 };
+
+/*            */
+struct wake_lock nfc_wake_lock;
 
 static void bcm2079x_init_stat(struct bcm2079x_dev *bcm2079x_dev)
 {
@@ -73,6 +81,13 @@ static void bcm2079x_disable_irq(struct bcm2079x_dev *bcm2079x_dev)
 	spin_lock_irqsave(&bcm2079x_dev->irq_enabled_lock, flags);
 	if (bcm2079x_dev->irq_enabled) {
 		disable_irq_nosync(bcm2079x_dev->client->irq);
+	
+/*            */
+		if (bcm2079x_dev->irq_wake_enabled)
+		{
+			disable_irq_wake(bcm2079x_dev->client->irq);
+			bcm2079x_dev->irq_wake_enabled = false;
+		}
 		bcm2079x_dev->irq_enabled = false;
 	}
 	spin_unlock_irqrestore(&bcm2079x_dev->irq_enabled_lock, flags);
@@ -85,6 +100,13 @@ static void bcm2079x_enable_irq(struct bcm2079x_dev *bcm2079x_dev)
 	if (!bcm2079x_dev->irq_enabled) {
 		bcm2079x_dev->irq_enabled = true;
 		enable_irq(bcm2079x_dev->client->irq);
+
+/*            */
+		if (!bcm2079x_dev->irq_wake_enabled)
+		{
+			enable_irq_wake(bcm2079x_dev->client->irq);
+			bcm2079x_dev->irq_wake_enabled = true;
+		}
 	}
 	spin_unlock_irqrestore(&bcm2079x_dev->irq_enabled_lock, flags);
 }
@@ -152,6 +174,8 @@ static irqreturn_t bcm2079x_dev_irq_handler(int irq, void *dev_id)
 	bcm2079x_dev->count_irq++;
 	spin_unlock_irqrestore(&bcm2079x_dev->irq_enabled_lock, flags);
 	wake_up(&bcm2079x_dev->read_wq);
+/*            */
+	wake_lock(&nfc_wake_lock);
 
 	return IRQ_HANDLED;
 }
@@ -233,6 +257,10 @@ static ssize_t bcm2079x_dev_read(struct file *filp, char __user *buf,
 			"failed to copy to user space, total = %d\n", total);
 		total = -EFAULT;
 	}
+/*            */
+	if (bcm2079x_dev->count_irq == 0) {
+		wake_unlock(&nfc_wake_lock);
+	}
 
 	return total;
 }
@@ -301,9 +329,13 @@ static long bcm2079x_dev_unlocked_ioctl(struct file *filp,
 			 arg);
 		return change_client_addr(bcm2079x_dev, arg);
 	case BCMNFC_POWER_CTL:
+		dev_err(&bcm2079x_dev->client->dev,
+			"%s, BCMNFC_POWER_CTL (%x, %lx)\n", __func__, cmd, arg);
 		gpio_set_value(bcm2079x_dev->en_gpio, arg);
 		break;
 	case BCMNFC_WAKE_CTL:
+		dev_err(&bcm2079x_dev->client->dev,
+			"%s, BCMNFC_WAKE_CTL (%x, %lx)\n", __func__, cmd, arg);
 		gpio_set_value(bcm2079x_dev->wake_gpio, arg);
 		break;
 	default:
@@ -329,7 +361,9 @@ static int bcm2079x_probe(struct i2c_client *client,
 			   const struct i2c_device_id *id)
 {
 	int ret;
-	struct bcm2079x_platform_data *platform_data;
+/*            */
+	// struct bcm2079x_platform_data *platform_data;
+	struct bcm43341_platform_data *platform_data;		//                           
 	struct bcm2079x_dev *bcm2079x_dev;
 
 	platform_data = client->dev.platform_data;
@@ -354,6 +388,14 @@ static int bcm2079x_probe(struct i2c_client *client,
 	ret = gpio_request_one(platform_data->wake_gpio, GPIOF_OUT_INIT_LOW,"nfc_firm");
 	if (ret)
 		goto err_firm;
+/*
+	dev_err(&client->dev,
+			 "%s, IRQ_GPIO %x:\n", __func__, platform_data->irq_gpio);
+	dev_err(&client->dev,
+			 "%s, VEN_GPIO %x:\n", __func__, platform_data->en_gpio);
+	dev_err(&client->dev,
+			 "%s, WAKE_GPIO %x:\n", __func__, platform_data->wake_gpio);
+*/   //hyunho.koh
 
 	gpio_set_value(platform_data->en_gpio, 0);
 	gpio_set_value(platform_data->wake_gpio, 0);
@@ -386,6 +428,9 @@ static int bcm2079x_probe(struct i2c_client *client,
 		goto err_misc_register;
 	}
 
+/*            */
+	wake_lock_init(&nfc_wake_lock, WAKE_LOCK_SUSPEND, "NFCWAKE");
+
 	/* request irq.  the irq is set whenever the chip has data available
 	 * for reading.  it is cleared when all data has been read.
 	 */
@@ -397,6 +442,10 @@ static int bcm2079x_probe(struct i2c_client *client,
 		dev_err(&client->dev, "request_irq failed\n");
 		goto err_request_irq_failed;
 	}
+	
+/*            */
+	bcm2079x_dev->irq_wake_enabled = false;	//hyunho.koh
+	 
 	bcm2079x_disable_irq(bcm2079x_dev);
 	i2c_set_clientdata(client, bcm2079x_dev);
 	dev_info(&client->dev,
@@ -465,6 +514,7 @@ static void __exit bcm2079x_dev_exit(void)
 }
 module_exit(bcm2079x_dev_exit);
 
+MODULE_DEVICE_TABLE(i2c, bcm2079x_id);
 MODULE_AUTHOR("Broadcom");
 MODULE_DESCRIPTION("NFC bcm2079x driver");
 MODULE_LICENSE("GPL");

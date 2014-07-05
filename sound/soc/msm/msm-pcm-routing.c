@@ -837,7 +837,12 @@ static int msm_routing_get_fm_vol_mixer(struct snd_kcontrol *kcontrol,
 static int msm_routing_set_fm_vol_mixer(struct snd_kcontrol *kcontrol,
 				struct snd_ctl_elem_value *ucontrol)
 {
+#ifdef CONFIG_FM_RADIO_MI2S_ENABLE
+		afe_loopback_gain(MI2S_TX , ucontrol->value.integer.value[0]);
+#else
 	afe_loopback_gain(INT_FM_TX, ucontrol->value.integer.value[0]);
+#endif
+
 	msm_route_fm_vol_control = ucontrol->value.integer.value[0];
 	return 0;
 }

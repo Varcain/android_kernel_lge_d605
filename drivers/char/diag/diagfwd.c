@@ -1881,6 +1881,11 @@ void diagfwd_init(void)
 		goto err;
 	}
 #endif
+#ifdef CONFIG_USB_LGE_ANDROID_DIAG_OSP_SUPPORT
+	driver->diag_read_status = 1;
+	init_waitqueue_head(&driver->diag_read_wait_q);
+#endif
+
 	platform_driver_register(&msm_smd_ch1_driver);
 	platform_driver_register(&diag_smd_lite_driver);
 	return;

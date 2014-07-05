@@ -92,6 +92,12 @@ struct pm8921_bms_platform_data {
 };
 
 #if defined(CONFIG_PM8921_BMS) || defined(CONFIG_PM8921_BMS_MODULE)
+/* 2012-04-28 Lx-battery-informaion
+L0 4.3V LGC_BL44JH_1700_data
+L0 4.2V LGC_BL44JS_1700_data
+L1 4.3V LGC_BL53QH_2000_data
+*/
+
 /**
  * pm8921_bms_get_vsense_avg - return the voltage across the sense
  *				resitor in microvolts
@@ -189,6 +195,11 @@ void pm8921_bms_battery_removed(void);
  *			for reporting soc.
  */
 void pm8921_bms_battery_inserted(void);
+#ifdef CONFIG_LGE_PM_BOOST_IC
+extern bool boost_enable_flag;
+#define BOOST_ENABLE_THRESHOLD 3700
+#endif
+
 #else
 static inline int pm8921_bms_get_vsense_avg(int *result)
 {

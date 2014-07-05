@@ -2507,6 +2507,14 @@ static int msmsdcc_setup_vreg(struct msmsdcc_host *host, bool enable,
 	struct msm_mmc_slot_reg_data *curr_slot;
 	struct msm_mmc_reg_data *vreg_table[2];
 
+#ifdef CONFIG_MACH_MSM8930_FX3
+//garry.shin
+    if( host->mmc->index == 2 )
+	{
+		printk("%s:mmc2 return 0\n", __func__ );
+		return 0;
+	}
+#endif
 	curr_slot = host->plat->vreg_data;
 	if (!curr_slot) {
 		rc = -EINVAL;
@@ -6088,8 +6096,11 @@ msmsdcc_probe(struct platform_device *pdev)
 	mmc->clk_scaling.up_threshold = 35;
 	mmc->clk_scaling.down_threshold = 5;
 	mmc->clk_scaling.polling_delay_ms = 100;
+#if defined (CONFIG_MACH_LGE_L9II_COMMON)
+// temp_clk_scaling_blocked
+#else
 	mmc->caps2 |= MMC_CAP2_CLK_SCALE;
-
+#endif
 #ifdef CONFIG_HAS_EARLYSUSPEND
 	host->early_suspend.suspend = msmsdcc_early_suspend;
 	host->early_suspend.resume  = msmsdcc_late_resume;

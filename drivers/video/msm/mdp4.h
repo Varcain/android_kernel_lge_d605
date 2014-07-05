@@ -53,6 +53,22 @@ extern u32 mdp_iommu_max_map_size;
 #define CS_CONTROLLER_0 0x0707ffff
 #define CS_CONTROLLER_1 0x03073f3f
 
+//                                                                     
+#ifdef CONFIG_ARCH_MSM8930
+#define CSC_RESTORE
+#define CMAP_RESTORE
+#endif
+
+#ifdef CMAP_RESTORE
+extern unsigned char cmap_lut_changed;
+#endif
+
+#ifdef CSC_RESTORE
+extern bool csc_dmap_changed;
+extern struct mdp_csc_cfg_data csc_cfg_backup_matrix;
+#endif
+//                                               
+
 typedef int (*cmd_fxn_t)(struct platform_device *pdev);
 
 enum {		/* display */
@@ -298,7 +314,6 @@ struct mdp4_overlay_pipe {
 	uint32 src_format;
 	uint32 src_width;	/* source img width */
 	uint32 src_height;	/* source img height */
-	uint32 frame_size;	/* TILE frame size */
 	uint32 is_3d;
 	uint32 src_width_3d;	/* source img width */
 	uint32 src_height_3d;	/* source img height */
@@ -383,6 +398,13 @@ struct mdp4_overlay_pipe {
 	struct completion comp;
 	struct completion dmas_comp;
 	struct mdp4_iommu_pipe_info iommu;
+
+/*                                                                */
+#if defined(CONFIG_MACH_LGE_FX3_VZW) || defined(CONFIG_MACH_LGE_FX3Q_TMUS) 
+	uint32 ext_flag;
+	struct msm_fb_data_type *mfd;
+#endif
+/*                                                              */
 };
 
 struct mdp4_statistic {
@@ -872,6 +894,7 @@ static inline void mdp4_overlay_dsi_video_start(void)
 
 static int mdp4_dsi_video_splash_done(void)
 {
+	return 0;
 }
 #endif /* CONFIG_FB_MSM_MIPI_DSI */
 

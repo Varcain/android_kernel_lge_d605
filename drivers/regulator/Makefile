@@ -60,5 +60,8 @@ obj-$(CONFIG_REGULATOR_WM8350) += wm8350-regulator.o
 obj-$(CONFIG_REGULATOR_WM8400) += wm8400-regulator.o
 obj-$(CONFIG_REGULATOR_WM8994) += wm8994-regulator.o
 obj-$(CONFIG_REGULATOR_QPNP) += qpnp-regulator.o
+# LGE_CHANGE_S [koh.euije@lge.com] LCD for L9II REV
+obj-$(CONFIG_LCD_BIAS_TPS65132) += tps65132-lcd-bias.o
+# LGE_CHANGE_E [koh.euije@lge.com] LCD for L9II REV
 
 ccflags-$(CONFIG_REGULATOR_DEBUG) += -DDEBUG

@@ -35,6 +35,11 @@
 #include <mach/subsystem_notif.h>
 #include <mach/subsystem_restart.h>
 
+#if defined(CONFIG_LGE_CRASH_HANDLER)
+#include <mach/restart.h>
+#include <mach/board_lge.h>
+#endif
+
 #include "smd_private.h"
 
 struct subsys_soc_restart_order {
@@ -87,6 +92,9 @@ module_param(enable_ramdumps, int, S_IRUGO | S_IWUSR);
 
 struct workqueue_struct *ssr_wq;
 
+#ifdef CONFIG_MACH_LGE
+static int modem_reboot_cnt = 0;
+#endif
 static LIST_HEAD(restart_log_list);
 static LIST_HEAD(subsystem_list);
 static DEFINE_MUTEX(subsystem_list_lock);
@@ -114,6 +122,28 @@ DEFINE_SINGLE_RESTART_ORDER(orders_8x60_all, _order_8x60_all);
 static const char * const _order_8x60_modems[] = {"external_modem", "modem"};
 DEFINE_SINGLE_RESTART_ORDER(orders_8x60_modems, _order_8x60_modems);
 
+//                                                                                      
+#define LGE_BSP_MODEM_CRASH_DISPLAY
+
+#ifdef LGE_BSP_MODEM_CRASH_DISPLAY
+#define MODEM_SUBSYSTEM "modem"
+#endif //                            
+//                                                   
+
+#if defined(CONFIG_MACH_LGE)
+/* MSM 8960 restart ordering info */
+static const char * const order_8960[] = {"modem", "lpass"};
+
+static struct subsys_soc_restart_order restart_orders_8960_one = {
+	.subsystem_list = order_8960,
+	.count = ARRAY_SIZE(order_8960),
+	.subsys_ptrs = {[ARRAY_SIZE(order_8960)] = NULL}
+	};
+
+static struct subsys_soc_restart_order *restart_orders_8960[] = {
+	&restart_orders_8960_one,
+	};
+#endif
 /*SGLTE restart ordering info*/
 static const char * const order_8960_sglte[] = {"external_modem",
 						"modem"};
@@ -128,6 +158,9 @@ static struct subsys_soc_restart_order *restart_orders_8960_sglte[] = {
 	&restart_orders_8960_fusion_sglte,
 	};
 
+#if defined(CONFIG_MACH_LGE)
+  /* nothing */
+#else
 /* SGLTE2 restart ordering info*/
 static const char * const order_8064_sglte2[] = {"external_modem",
 						"external_modem_mdm"};
@@ -141,6 +174,7 @@ static struct subsys_soc_restart_order restart_orders_8064_fusion_sglte2 = {
 static struct subsys_soc_restart_order *restart_orders_8064_sglte2[] = {
 	&restart_orders_8064_fusion_sglte2,
 	};
+#endif
 
 /* These will be assigned to one of the sets above after
  * runtime SoC identification.
@@ -149,6 +183,9 @@ static struct subsys_soc_restart_order **restart_orders;
 static int n_restart_orders;
 
 static int restart_level = RESET_SUBSYS_INDEPENDENT;
+#ifdef CONFIG_MACH_LGE
+module_param(modem_reboot_cnt, int, S_IRUGO | S_IWUSR);
+#endif
 
 int get_restart_level()
 {
@@ -365,6 +402,10 @@ static void subsystem_restart_wq_func(struct work_struct *work)
 	unsigned count;
 	unsigned long flags;
 
+#if defined(CONFIG_LGE_CRASH_HANDLER)
+	int subsys_magic_key = lge_get_magic_for_subsystem();
+#endif
+
 	if (restart_level != RESET_SUBSYS_INDEPENDENT)
 		soc_restart_order = dev->restart_order;
 
@@ -406,6 +447,9 @@ static void subsystem_restart_wq_func(struct work_struct *work)
 	 * order is being rebooted.
 	 */
 	if (!mutex_trylock(powerup_lock)) {
+#if defined(CONFIG_LGE_CRASH_HANDLER)
+		msm_set_restart_mode(subsys_magic_key|SUB_THD_F_PWR);
+#endif
 		panic("%s[%p]: Subsystem died during powerup!",
 						__func__, current);
 	}
@@ -486,6 +530,20 @@ static void __subsystem_restart_dev(struct subsys_device *dev)
 int subsystem_restart_dev(struct subsys_device *dev)
 {
 	const char *name = dev->desc->name;
+//                                                                                      
+#ifdef LGE_BSP_MODEM_CRASH_DISPLAY
+	int i, smem_size;
+	int size = 1000;
+	unsigned char *modem_crash_log;
+#endif
+//                                                   
+#if defined(CONFIG_LGE_CRASH_HANDLER)
+	u32 subsys_magic_key;;
+#endif
+
+#if defined(CONFIG_LGE_CRASH_HANDLER)
+	lge_set_magic_for_subsystem(name);
+#endif
 
 	/*
 	 * If a system reboot/shutdown is underway, ignore subsystem errors.
@@ -501,6 +559,56 @@ int subsystem_restart_dev(struct subsys_device *dev)
 	pr_info("Restart sequence requested for %s, restart_level = %d.\n",
 		name, restart_level);
 
+#ifdef CONFIG_MACH_LGE
+	if (!strcmp(name, MODEM_SUBSYSTEM)) {
+		modem_reboot_cnt++;
+		if (modem_reboot_cnt < 0)
+			modem_reboot_cnt = 1;
+	}
+#endif
+//                                                                                      
+#ifdef LGE_BSP_MODEM_CRASH_DISPLAY
+	if ( !strcmp(name, MODEM_SUBSYSTEM) )
+	{
+		printk("\n======== Modem Crash Debug Message ========\n");
+
+		modem_crash_log = smem_get_entry(SMEM_ERR_CRASH_LOG, &smem_size);
+		printk("modem_crash_log addr : 0x%p, size : 0x%x\n", modem_crash_log, smem_size);
+	
+		if (!modem_crash_log)
+		{
+			printk("smem_get_entry is failed.\n");
+		}
+		else
+		{
+			if (strncmp(modem_crash_log, "ERR", 3) != 0)
+			{
+				printk("can't find modem crash message.\n");
+				printk("skip display modem error information.\n");
+			}
+			else
+			{
+				printk("modem crash message will be displayed.\n");
+				
+				for(i=0; i<size; i++)
+				{					
+					if (readb(modem_crash_log+i) == 'R' && readb(modem_crash_log+i+1) == 'E' && readb(modem_crash_log+i+2) == 'X')
+					{
+						printk("REX is finded.\n");
+						break;
+					}
+					printk("%c", readb(modem_crash_log+i));
+				}
+			}
+		}
+		printk("======== Modem Crash Debug Message End ========\n\n");
+	}
+#endif //                           
+//                                                   
+
+#if defined(CONFIG_LGE_CRASH_HANDLER)
+	subsys_magic_key = lge_get_magic_for_subsystem();
+#endif
 	switch (restart_level) {
 
 	case RESET_SUBSYS_COUPLED:
@@ -508,9 +616,15 @@ int subsystem_restart_dev(struct subsys_device *dev)
 		__subsystem_restart_dev(dev);
 		break;
 	case RESET_SOC:
+#if defined(CONFIG_LGE_CRASH_HANDLER)
+		msm_set_restart_mode(subsys_magic_key|SUB_RESET_SOC);
+#endif
 		panic("subsys-restart: Resetting the SoC - %s crashed.", name);
 		break;
 	default:
+#if defined(CONFIG_LGE_CRASH_HANDLER)
+		msm_set_restart_mode(SUB_UNKNOWN);
+#endif
 		panic("subsys-restart: Unknown restart level!\n");
 		break;
 	}
@@ -591,7 +705,54 @@ static int ssr_panic_handler(struct notifier_block *this,
 static struct notifier_block panic_nb = {
 	.notifier_call  = ssr_panic_handler,
 };
+#if defined(CONFIG_MACH_LGE)
+static int __init ssr_init_soc_restart_orders(void)
+{
+	int i;
 
+	atomic_notifier_chain_register(&panic_notifier_list,
+			&panic_nb);
+
+	if (cpu_is_msm8x60()) {
+		for (i = 0; i < ARRAY_SIZE(orders_8x60_all); i++) {
+			mutex_init(&orders_8x60_all[i]->powerup_lock);
+			mutex_init(&orders_8x60_all[i]->shutdown_lock);
+		}
+
+		for (i = 0; i < ARRAY_SIZE(orders_8x60_modems); i++) {
+			mutex_init(&orders_8x60_modems[i]->powerup_lock);
+			mutex_init(&orders_8x60_modems[i]->shutdown_lock);
+		}
+
+		restart_orders = orders_8x60_all;
+		n_restart_orders = ARRAY_SIZE(orders_8x60_all);
+	}
+
+	if (cpu_is_msm8960() || cpu_is_msm8930() || cpu_is_msm8930aa() ||
+	    cpu_is_msm9615() || cpu_is_apq8064() || cpu_is_msm8627()) {
+		if (socinfo_get_platform_subtype() == PLATFORM_SUBTYPE_SGLTE) {
+			restart_orders = restart_orders_8960_sglte;
+			n_restart_orders =
+				ARRAY_SIZE(restart_orders_8960_sglte);
+		} else {
+			restart_orders = restart_orders_8960;
+			n_restart_orders = ARRAY_SIZE(restart_orders_8960);
+		}
+		for (i = 0; i < n_restart_orders; i++) {
+			mutex_init(&restart_orders[i]->powerup_lock);
+			mutex_init(&restart_orders[i]->shutdown_lock);
+		}
+	}
+
+	if (restart_orders == NULL || n_restart_orders < 1) {
+		WARN_ON(1);
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+#else /* QCT Original */
 static int __init ssr_init_soc_restart_orders(void)
 {
 	int i;
@@ -635,6 +796,7 @@ static int __init ssr_init_soc_restart_orders(void)
 
 	return 0;
 }
+#endif
 
 static int __init subsys_restart_init(void)
 {

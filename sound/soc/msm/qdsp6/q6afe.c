@@ -519,6 +519,11 @@ int afe_port_start(u16 port_id, union afe_port_config *afe_config,
 	struct afe_audioif_config_command config;
 	int ret;
 
+	//                                                                            
+	#ifdef CONFIG_LGE_AFE_RECOVERY
+	int count = 0;
+	#endif //                        
+
 	if (!afe_config) {
 		pr_err("%s: Error, no configuration data\n", __func__);
 		ret = -EINVAL;
@@ -620,6 +625,11 @@ int afe_port_start(u16 port_id, union afe_port_config *afe_config,
 	config.port_id = port_id;
 	config.port = *afe_config;
 
+//                                                                            
+#ifdef CONFIG_LGE_AFE_RECOVERY
+send_cfg_cmd:
+#endif //                        
+
 	atomic_set(&this_afe.state, 1);
 	atomic_set(&this_afe.status, 0);
 	ret = apr_send_pkt(this_afe.apr, (uint32_t *) &config);
@@ -641,6 +651,16 @@ int afe_port_start(u16 port_id, union afe_port_config *afe_config,
 	}
 	if (atomic_read(&this_afe.status) != 0) {
 		pr_err("%s: config cmd failed\n", __func__);
+
+		//                                                                            
+		#ifdef CONFIG_LGE_AFE_RECOVERY
+		if (count < 2) {
+			afe_close(port_id);
+			count++;
+			goto send_cfg_cmd;
+		}
+		#endif //                        
+
 		ret = -EINVAL;
 		goto fail_cmd;
 	}
@@ -1871,6 +1891,19 @@ static int __init afe_init(void)
 	atomic_set(&this_afe.status, 0);
 	this_afe.apr = NULL;
 #ifdef CONFIG_DEBUG_FS
+#ifdef CONFIG_LGE_AUDIO
+	/*
+                                                      
+                               
+  */
+	debugfs_afelb = debugfs_create_file("afe_loopback",
+	S_IFREG | S_IWUSR | S_IWGRP, NULL, (void *) "afe_loopback",
+	&afe_debug_fops);
+
+	debugfs_afelb_gain = debugfs_create_file("afe_loopback_gain",
+	S_IFREG | S_IWUSR | S_IWGRP, NULL, (void *) "afe_loopback_gain",
+	&afe_debug_fops);
+#else
 	debugfs_afelb = debugfs_create_file("afe_loopback",
 	0220, NULL, (void *) "afe_loopback",
 	&afe_debug_fops);
@@ -1880,6 +1913,7 @@ static int __init afe_init(void)
 	&afe_debug_fops);
 
 
+#endif
 #endif
 	return 0;
 }

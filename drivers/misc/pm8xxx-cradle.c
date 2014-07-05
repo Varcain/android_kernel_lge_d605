@@ -29,16 +29,19 @@
 #include <linux/mfd/pm8xxx/cradle.h>
 #include <linux/gpio.h>
 #include <linux/switch.h>
+#include <linux/wakelock.h>
 
 static int pre_set_flag;
 struct pm8xxx_cradle {
 	struct switch_dev sdev;
-	struct work_struct work;
+	struct work_struct work; //TEMP_FX3Q
+	struct delayed_work delay_work; //TEMP_FX3Q
 	struct device *dev;
 	const struct pm8xxx_cradle_platform_data *pdata;
 	int carkit;
 	int pouch;
 	spinlock_t lock;
+	struct wake_lock wake_lock;
 	int state;
 };
 
@@ -92,6 +95,7 @@ int cradle_get_deskdock(void)
 	return cradle->state;
 }
 
+#if defined(CONFIG_BU52031NVX_CARKITDETECT)
 static irqreturn_t pm8xxx_carkit_irq_handler(int irq, void *handle)
 {
 	struct pm8xxx_cradle *cradle_handle = handle;
@@ -99,7 +103,9 @@ static irqreturn_t pm8xxx_carkit_irq_handler(int irq, void *handle)
 	queue_work(cradle_wq, &cradle_handle->work);
 	return IRQ_HANDLED;
 }
+#endif
 
+#if defined(CONFIG_BU52031NVX_POUCHDETECT)
 static irqreturn_t pm8xxx_pouch_irq_handler(int irq, void *handle)
 {
 	struct pm8xxx_cradle *cradle_handle = handle;
@@ -107,7 +113,9 @@ static irqreturn_t pm8xxx_pouch_irq_handler(int irq, void *handle)
 	queue_work(cradle_wq, &cradle_handle->work);
 	return IRQ_HANDLED;
 }
+#endif
 
+#if defined(CONFIG_BU52031NVX_CARKITDETECT)
 static ssize_t
 cradle_carkit_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -116,7 +124,9 @@ cradle_carkit_show(struct device *dev, struct device_attribute *attr, char *buf)
 	len = snprintf(buf, PAGE_SIZE, "%d\n", !cradle->carkit);
 	return len;
 }
+#endif
 
+#if defined(CONFIG_BU52031NVX_POUCHDETECT)
 static ssize_t
 cradle_pouch_show(struct device *dev, struct device_attribute *attr, char *buf)
 {
@@ -126,6 +136,7 @@ cradle_pouch_show(struct device *dev, struct device_attribute *attr, char *buf)
 	return len;
 
 }
+#endif
 
 static ssize_t
 cradle_sensing_show(struct device *dev, struct device_attribute *attr, char *buf)
@@ -137,11 +148,55 @@ cradle_sensing_show(struct device *dev, struct device_attribute *attr, char *buf
 
 }
 
+static ssize_t
+cradle_send_event_show(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	struct pm8xxx_cradle *cradle = dev_get_drvdata(dev);
+	return switch_get_state(&cradle->sdev);
+}
+
+
+static ssize_t
+cradle_send_event_store(struct device *dev, struct device_attribute *attr, const char *buf, size_t count)
+{
+	struct pm8xxx_cradle *cradle = dev_get_drvdata(dev);
+	int cmd;
+
+	if (sscanf(buf, "%d", &cmd) != 1)
+		return -EINVAL;
+
+	switch (cmd) {
+	case 0: /* touch power on */
+		switch_set_state(&cradle->sdev, 0);
+		break;
+	case 1: /*touch power off */
+		switch_set_state(&cradle->sdev, 1);
+		break;
+	case 2:
+		switch_set_state(&cradle->sdev, 2);
+		break;
+	case 256:
+		switch_set_state(&cradle->sdev, 256);
+		break;
+	default:
+		printk(KERN_INFO "ERROR  invalid value\n");
+		break;
+	}
+	return count;
+}
+
+
 static struct device_attribute cradle_device_attrs[] = {
+#if defined(CONFIG_BU52031NVX_CARKITDETECT)
 	__ATTR(carkit,  S_IRUGO | S_IWUSR, cradle_carkit_show, NULL),
+#endif
+#if defined(CONFIG_BU52031NVX_POUCHDETECT)
 	__ATTR(pouch, S_IRUGO | S_IWUSR, cradle_pouch_show, NULL),
+#endif
 	__ATTR(sensing,  S_IRUGO | S_IWUSR, cradle_sensing_show, NULL),
+	__ATTR(send_event ,  S_IRUGO | S_IWUSR, cradle_send_event_show, cradle_send_event_store),
 };
+
 
 static ssize_t cradle_print_name(struct switch_dev *sdev, char *buf)
 {
@@ -186,6 +241,7 @@ static int __devinit pm8xxx_cradle_probe(struct platform_device *pdev)
 
 	printk("%s : init cradle\n", __func__);
 
+#if defined(CONFIG_BU52031NVX_CARKITDETECT)
 	if (pdata->carkit_irq) {
 		ret = request_irq(pdata->carkit_irq, pm8xxx_carkit_irq_handler, pdata->irq_flags, PM8XXX_CRADLE_DEV_NAME, cradle);
 		if (ret > 0) {
@@ -194,6 +250,9 @@ static int __devinit pm8xxx_cradle_probe(struct platform_device *pdev)
 		}
 	}
 
+#endif
+
+#if defined(CONFIG_BU52031NVX_POUCHDETECT)
 	if (pdata->pouch_irq) {
 		ret = request_irq(pdata->pouch_irq, pm8xxx_pouch_irq_handler, pdata->irq_flags, PM8XXX_CRADLE_DEV_NAME, cradle);
 		if (ret > 0) {
@@ -201,6 +260,7 @@ static int __devinit pm8xxx_cradle_probe(struct platform_device *pdev)
 			goto err_request_irq;
 		}
 	}
+#endif
 
 	for (i = 0; i < ARRAY_SIZE(cradle_device_attrs); i++) {
 		ret = device_create_file(&pdev->dev, &cradle_device_attrs[i]);
@@ -218,6 +278,15 @@ err_request_irq:
 		free_irq(pdata->pouch_irq, 0);
 
 err_switch_dev_register:
+#if defined(CONFIG_BU52031NVX_CARKITDETECT)
+	if (pdata->carkit_irq)
+		free_irq(pdata->carkit_irq, 0);
+#endif
+#if defined(CONFIG_BU52031NVX_POUCHDETECT)
+	if (pdata->pouch_irq)
+		free_irq(pdata->pouch_irq, 0);
+#endif
+
 	switch_dev_unregister(&cradle->sdev);
 	kfree(cradle);
 	return ret;

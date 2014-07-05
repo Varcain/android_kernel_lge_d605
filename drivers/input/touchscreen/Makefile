@@ -58,6 +58,9 @@ obj-$(CONFIG_TOUCHSCREEN_TI_TSCADC)	+= ti_tscadc.o
 obj-$(CONFIG_TOUCHSCREEN_TNETV107X)	+= tnetv107x-ts.o
 obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI)	+= synaptics_i2c_rmi.o
 obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_RMI4_I2C) +=synaptics/
+# LGE_CHANGE
+obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4) += synaptics_i2c_rmi4.o
+obj-$(CONFIG_TOUCH_SYNAPTICS_FW_UPGRADE) += synaptics_fw_upgrade.o
 obj-$(CONFIG_TOUCHSCREEN_TOUCHIT213)	+= touchit213.o
 obj-$(CONFIG_TOUCHSCREEN_TOUCHRIGHT)	+= touchright.o
 obj-$(CONFIG_TOUCHSCREEN_TOUCHWIN)	+= touchwin.o
@@ -86,3 +89,30 @@ obj-$(CONFIG_TOUCHSCREEN_FT5X06)	+= ft5x06_ts.o
 obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4)		+= synaptics_i2c_rmi4.o
 obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_DSX_RMI4_DEV)	+= synaptics_rmi_dev.o
 obj-$(CONFIG_TOUCHSCREEN_SYNAPTICS_DSX_FW_UPDATE) 	+= synaptics_fw_update.o
+
+# LGE_CHANGE
+#obj-$(CONFIG_TOUCHSCREEN_CY8C_TS)	+= cy8c_ts.o
+#obj-$(CONFIG_TOUCHSCREEN_CYTTSP_I2C_QC)       += cyttsp-i2c-qc.o
+obj-$(CONFIG_TOUCHSCREEN_MELFAS_MMS134)	+= melfas_mms134_ts.o
+obj-$(CONFIG_TOUCHSCREEN_MELFAS_MMS134)        += MMS134S_ISC_Updater_Customize.o
+obj-$(CONFIG_TOUCHSCREEN_MELFAS_MMS134)        += MMS134S_ISC_Updater_V04.o
+obj-$(CONFIG_TOUCHSCREEN_MMS128)        += melfas_ts.o
+obj-$(CONFIG_TOUCHSCREEN_MMS128)        += mms136_ISP_download.o
+obj-$(CONFIG_TOUCHSCREEN_MMS128)        += mms136_ISC_download.o
+obj-$(CONFIG_TS_INFO_CLASS) += ts_class.o
+# LGE_CHANGE_S [hoseong.han@lge.com] Touch for L9II
+ifdef CONFIG_MACH_LGE_L9II_COMMON
+# LGE_CHANHE_S [hoseong.lge@lge.com] 2013-03-20, MAX1187x Touch for L9II Rev.A
+#obj-$(CONFIG_LGE_TOUCHSCREEN_CORE) += lge_touch_core_l9ii.o
+#obj-$(CONFIG_LGE_TOUCH_SYNAPTICS) += touch_synaptics_l9ii.o
+#obj-$(CONFIG_LGE_TOUCH_SYNAPTICS_FW_UPGRADE) += touch_synaptics_fw_upgrade_2.o
+obj-$(CONFIG_TOUCHSCREEN_MAX1187X)	+= max1187x.o
+# LGE_CHANHE_E [hoseong.lge@lge.com] 2013-03-20
+else
+obj-$(CONFIG_LGE_TOUCHSCREEN_CORE) += lge_touch_core.o
+obj-$(CONFIG_LGE_TOUCH_SYNAPTICS) += touch_synaptics.o
+obj-$(CONFIG_LGE_TOUCH_SYNAPTICS_FW_UPGRADE) += touch_synaptics_fw_upgrade.o
+obj-$(CONFIG_LGE_TOUCH_SYNAPTICS_F54) += DS4/
+endif
+#LGE_CHANGE_E [hoseong.han@lge.com] Touch for L9II
+

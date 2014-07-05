@@ -94,6 +94,7 @@ static inline unsigned ecm_bitrate(struct usb_gadget *g)
 #define LOG2_STATUS_INTERVAL_MSEC	5	/* 1 << 5 == 32 msec */
 #ifdef CONFIG_USB_ANDROID_CDC_ECM
 #define ECM_STATUS_BYTECOUNT		64
+#define ECM_STATUS_NOTIFY_REQ_LEN	16
 #else
 #define ECM_STATUS_BYTECOUNT		16	/* 8 byte header + data */
 #endif
@@ -239,8 +240,13 @@ static struct usb_descriptor_header *ecm_fs_function[] = {
 	/* data interface, altsettings 0 and 1 */
 	(struct usb_descriptor_header *) &ecm_data_nop_intf,
 	(struct usb_descriptor_header *) &ecm_data_intf,
+#ifdef CONFIG_USB_LGE_ANDROID
+	(struct usb_descriptor_header *) &fs_ecm_out_desc,
+	(struct usb_descriptor_header *) &fs_ecm_in_desc,
+#else
 	(struct usb_descriptor_header *) &fs_ecm_in_desc,
 	(struct usb_descriptor_header *) &fs_ecm_out_desc,
+#endif
 	NULL,
 };
 
@@ -292,8 +298,13 @@ static struct usb_descriptor_header *ecm_hs_function[] = {
 	/* data interface, altsettings 0 and 1 */
 	(struct usb_descriptor_header *) &ecm_data_nop_intf,
 	(struct usb_descriptor_header *) &ecm_data_intf,
+#ifdef CONFIG_USB_LGE_ANDROID
+	(struct usb_descriptor_header *) &hs_ecm_out_desc,
+	(struct usb_descriptor_header *) &hs_ecm_in_desc,
+#else
 	(struct usb_descriptor_header *) &hs_ecm_in_desc,
 	(struct usb_descriptor_header *) &hs_ecm_out_desc,
+#endif
 	NULL,
 };
 
@@ -424,7 +435,11 @@ static void ecm_do_notify(struct f_ecm *ecm)
 		event->bNotificationType = USB_CDC_NOTIFY_SPEED_CHANGE;
 		event->wValue = cpu_to_le16(0);
 		event->wLength = cpu_to_le16(8);
+#ifdef CONFIG_USB_LGE_ANDROID
+		req->length = ECM_STATUS_NOTIFY_REQ_LEN;
+#else
 		req->length = ECM_STATUS_BYTECOUNT;
+#endif
 
 		/* SPEED_CHANGE data is up/down speeds in bits/sec */
 		data = req->buf + sizeof *event;

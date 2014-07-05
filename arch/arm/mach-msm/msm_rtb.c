@@ -71,7 +71,13 @@ static atomic_t msm_rtb_idx;
 #endif
 
 struct msm_rtb_state msm_rtb = {
+/*            */
+#if CONFIG_MACH_LGE
+	.filter = 1 << LOGK_CTXID | 1 << LOGK_HOTPLUG | 1 << LOGK_LOGBUF | \
+			  1 << LOGK_WRITEL | 1 << LOGK_READL | 1 << LOGK_NONE,
+#else
 	.filter = 1 << LOGK_READL | 1 << LOGK_WRITEL,
+#endif
 	.enabled = 1,
 };
 

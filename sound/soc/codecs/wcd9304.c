@@ -38,6 +38,14 @@
 #include <linux/wakelock.h>
 #include <linux/suspend.h>
 #include "wcd9304.h"
+#ifdef CONFIG_LGE_AUDIO_MBHC_SDEV
+#include <linux/switch.h>
+#endif
+#ifdef CONFIG_SWITCH_FSA8008
+#include <linux/gpio.h>
+#include "../../../arch/arm/mach-msm/include/mach/board_lge.h"
+#include "../../../arch/arm/mach-msm/lge/fx3/board-fx3.h"
+#endif
 
 #define WCD9304_RATES (SNDRV_PCM_RATE_8000|SNDRV_PCM_RATE_16000|\
 			SNDRV_PCM_RATE_32000|SNDRV_PCM_RATE_48000)
@@ -120,6 +128,9 @@ static int sitar_codec_enable_slimrx(struct snd_soc_dapm_widget *w,
 	struct snd_kcontrol *kcontrol, int event);
 static enum sitar_mbhc_plug_type
 sitar_codec_decide_gpio_plug(struct snd_soc_codec *codec);
+/*                 */
+static int sitar_ear_pa_event(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *kcontrol, int event);
 
 enum sitar_bandgap_type {
 	SITAR_BANDGAP_OFF = 0,
@@ -178,6 +189,13 @@ enum sitar_priv_ack_flags {
 	SITAR_HPHR_DAC_OFF_ACK
 };
 
+#ifdef CONFIG_LGE_AUDIO_MBHC_SDEV
+enum {
+	NO_DEVICE   = 0,
+	LGE_HEADSET = (1 << 0),
+	LGE_HEADSET_NO_MIC = (1 << 1),
+};
+#endif
 struct comp_sample_dependent_params {
 	u32 peak_det_timeout;
 	u32 rms_meter_div_fact;
@@ -268,7 +286,10 @@ struct sitar_priv {
 	bool mbhc_polling_active;
 	unsigned long mbhc_fake_ins_start;
 	int buttons_pressed;
-
+#ifdef CONFIG_SWITCH_FSA8008
+	u32 audio_band_gap_cnt;
+	u32 ldo_h_count;
+#endif
 	enum sitar_micbias_num micbias;
 	/* void* calibration contains:
 	 *  struct sitar_mbhc_general_cfg generic;
@@ -303,6 +324,9 @@ struct sitar_priv {
 	 */
 	struct work_struct hphlocp_work; /* reporting left hph ocp off */
 	struct work_struct hphrocp_work; /* reporting right hph ocp off */
+#ifdef CONFIG_LGE_AUDIO_MBHC_SDEV
+	struct switch_dev sdev;	/* for MBHC switch device driver */
+#endif
 
 	u8 hphlocp_cnt; /* headphone left ocp retry */
 	u8 hphrocp_cnt; /* headphone right ocp retry */
@@ -345,6 +369,31 @@ struct sitar_priv {
 
 #ifdef CONFIG_DEBUG_FS
 struct sitar_priv *debug_sitar_priv;
+#endif
+
+#ifdef CONFIG_LGE_AUDIO_MBHC_SDEV
+static ssize_t lge_hsd_print_name(struct switch_dev *sdev, char *buf)
+{
+	switch (switch_get_state(sdev)) {
+
+	case NO_DEVICE:
+		return sprintf(buf, "No Device");
+
+	case LGE_HEADSET:
+		return sprintf(buf, "Headset");
+
+	case LGE_HEADSET_NO_MIC:
+		return sprintf(buf, "Headset");
+
+/*      return sprintf(buf, "Headset_no_mic\n"); */
+	}
+	return -EINVAL;
+}
+
+static ssize_t lge_hsd_print_state(struct switch_dev *sdev, char *buf)
+{
+	return sprintf(buf, "%d\n", switch_get_state(sdev));
+}
 #endif
 
 static const int comp_rx_path[] = {
@@ -927,6 +976,44 @@ static const struct snd_kcontrol_new sitar_snd_controls[] = {
 	SOC_SINGLE_TLV("HPHR Volume", SITAR_A_RX_HPH_R_GAIN, 0, 12, 1,
 		line_gain),
 
+/*                                                    
+                                                                            
+ */
+//                                                               
+#if defined(CONFIG_MACH_LGE_L9II_COMMON)
+	SOC_SINGLE_S8_TLV("RX1 Digital Volume", SITAR_A_CDC_RX1_VOL_CTL_B2_CTL,
+		-60, 40, digital_gain),
+	SOC_SINGLE_S8_TLV("RX2 Digital Volume", SITAR_A_CDC_RX2_VOL_CTL_B2_CTL,
+		-60, 40, digital_gain),
+	SOC_SINGLE_S8_TLV("RX3 Digital Volume", SITAR_A_CDC_RX3_VOL_CTL_B2_CTL,
+		-60, 40, digital_gain),
+
+	SOC_SINGLE_S8_TLV("DEC1 Volume", SITAR_A_CDC_TX1_VOL_CTL_GAIN, -84, 40,
+		digital_gain),
+	SOC_SINGLE_S8_TLV("DEC2 Volume", SITAR_A_CDC_TX2_VOL_CTL_GAIN, -84, 40,
+		digital_gain),
+	SOC_SINGLE_S8_TLV("DEC3 Volume", SITAR_A_CDC_TX3_VOL_CTL_GAIN, -84, 40,
+		digital_gain),
+	SOC_SINGLE_S8_TLV("DEC4 Volume", SITAR_A_CDC_TX4_VOL_CTL_GAIN, -84, 40,
+		digital_gain),
+//                                                               
+#elif defined(CONFIG_LGE_AUDIO) /*          */
+	SOC_SINGLE_S8_TLV("RX1 Digital Volume", SITAR_A_CDC_RX1_VOL_CTL_B2_CTL,
+		-60, 40, digital_gain),
+	SOC_SINGLE_S8_TLV("RX2 Digital Volume", SITAR_A_CDC_RX2_VOL_CTL_B2_CTL,
+		-60, 40, digital_gain),
+	SOC_SINGLE_S8_TLV("RX3 Digital Volume", SITAR_A_CDC_RX3_VOL_CTL_B2_CTL,
+		-60, 40, digital_gain),
+
+	SOC_SINGLE_S8_TLV("DEC1 Volume", SITAR_A_CDC_TX1_VOL_CTL_GAIN, -60, 40,
+		digital_gain),
+	SOC_SINGLE_S8_TLV("DEC2 Volume", SITAR_A_CDC_TX2_VOL_CTL_GAIN, -60, 40,
+		digital_gain),
+	SOC_SINGLE_S8_TLV("DEC3 Volume", SITAR_A_CDC_TX3_VOL_CTL_GAIN, -60, 40,
+		digital_gain),
+	SOC_SINGLE_S8_TLV("DEC4 Volume", SITAR_A_CDC_TX4_VOL_CTL_GAIN, -60, 40,
+		digital_gain),
+#else /* Qualcomm original code */
 	SOC_SINGLE_S8_TLV("RX1 Digital Volume", SITAR_A_CDC_RX1_VOL_CTL_B2_CTL,
 		-84, 40, digital_gain),
 	SOC_SINGLE_S8_TLV("RX2 Digital Volume", SITAR_A_CDC_RX2_VOL_CTL_B2_CTL,
@@ -942,7 +1029,19 @@ static const struct snd_kcontrol_new sitar_snd_controls[] = {
 		digital_gain),
 	SOC_SINGLE_S8_TLV("DEC4 Volume", SITAR_A_CDC_TX4_VOL_CTL_GAIN, -84, 40,
 		digital_gain),
+#endif
+/*                                                  */
 
+#if defined(CONFIG_LGE_AUDIO) /*          */
+	SOC_SINGLE_S8_TLV("IIR1 INP1 Volume", SITAR_A_CDC_IIR1_GAIN_B1_CTL, -60,
+		50, digital_gain),
+	SOC_SINGLE_S8_TLV("IIR1 INP2 Volume", SITAR_A_CDC_IIR1_GAIN_B2_CTL, -60,
+		50, digital_gain),
+	SOC_SINGLE_S8_TLV("IIR1 INP3 Volume", SITAR_A_CDC_IIR1_GAIN_B3_CTL, -60,
+		50, digital_gain),
+	SOC_SINGLE_S8_TLV("IIR1 INP4 Volume", SITAR_A_CDC_IIR1_GAIN_B4_CTL, -60,
+		50, digital_gain),
+#else /* Qualcomm original code */
 	SOC_SINGLE_S8_TLV("IIR1 INP1 Volume", SITAR_A_CDC_IIR1_GAIN_B1_CTL, -84,
 		40, digital_gain),
 	SOC_SINGLE_S8_TLV("IIR1 INP2 Volume", SITAR_A_CDC_IIR1_GAIN_B2_CTL, -84,
@@ -951,9 +1050,15 @@ static const struct snd_kcontrol_new sitar_snd_controls[] = {
 		40, digital_gain),
 	SOC_SINGLE_S8_TLV("IIR1 INP4 Volume", SITAR_A_CDC_IIR1_GAIN_B4_CTL, -84,
 		40, digital_gain),
+#endif
 	SOC_SINGLE_TLV("ADC1 Volume", SITAR_A_TX_1_2_EN, 5, 3, 0, analog_gain),
 	SOC_SINGLE_TLV("ADC2 Volume", SITAR_A_TX_1_2_EN, 1, 3, 0, analog_gain),
 	SOC_SINGLE_TLV("ADC3 Volume", SITAR_A_TX_3_EN, 5, 3, 0, analog_gain),
+
+//                       
+    SOC_SINGLE("MICBIAS1 CAPLESS Switch", SITAR_A_MICB_1_CTL, 4, 1, 1),
+    SOC_SINGLE("MICBIAS2 CAPLESS Switch", SITAR_A_MICB_2_CTL, 4, 1, 1),
+//                       
 
 	SOC_SINGLE_EXT("ANC Slot", SND_SOC_NOPM, 0, 0, 100, sitar_get_anc_slot,
 				   sitar_put_anc_slot),
@@ -1950,8 +2055,22 @@ static int sitar_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 			sitar_codec_switch_micbias(codec, 0);
 			SITAR_RELEASE_LOCK(sitar->codec_resource_lock);
 		}
-
-		snd_soc_update_bits(codec, w->reg, 0x1E, 0x00);
+//                                                                            
+#if defined(CONFIG_LGE_MicBias_EXT_CAPLESS_MODE)
+//Original code
+//			snd_soc_update_bits(codec, w->reg, 0x1E, 0x00);
+			
+		if((w->reg == SITAR_A_MICB_1_CTL)||(w->reg == SITAR_A_MICB_2_CTL))
+			snd_soc_update_bits(codec, w->reg, 0x0E, 0x00);
+		else
+			snd_soc_update_bits(codec, w->reg, 0x1E, 0x00);
+#else
+        if((w->reg == SITAR_A_MICB_1_CTL)||(w->reg == SITAR_A_MICB_2_CTL))
+			snd_soc_update_bits(codec, w->reg, 0x0E, 0x00);
+		else
+			snd_soc_update_bits(codec, w->reg, 0x1E, 0x00);
+#endif
+//                                                                          
 		sitar_codec_update_cfilt_usage(codec, cfilt_sel_val, 1);
 
 		if (strnstr(w->name, internal1_text, 30))
@@ -1986,6 +2105,35 @@ static int sitar_codec_enable_micbias(struct snd_soc_dapm_widget *w,
 
 	return 0;
 }
+
+#ifdef CONFIG_SWITCH_FSA8008
+static int sitar_codec_enable_ldo_h(struct snd_soc_dapm_widget *w,
+    struct snd_kcontrol *kcontrol, int event);
+
+static int sitar_codec_enable_micbias_power(struct snd_soc_dapm_widget *w,
+    struct snd_kcontrol *kcontrol, int event)
+{
+        struct snd_soc_codec *codec = w->codec;
+        struct sitar_priv *sitar = snd_soc_codec_get_drvdata(codec);
+        pr_debug("%s %d\n", __func__, event);
+        switch (event) {
+            case SND_SOC_DAPM_PRE_PMU:
+                sitar->mbhc_cfg.mclk_cb_fn(codec, MCLK_ON_BANDGAP_ON, true);
+                sitar_codec_enable_ldo_h(w, kcontrol, event);
+                sitar_codec_enable_micbias(w, kcontrol, event);
+                break;
+            case SND_SOC_DAPM_POST_PMU:
+                sitar->mbhc_cfg.mclk_cb_fn(codec, MCLK_OF_BANDGAP_ON, true);
+                break;
+			/* Add Test code from Srinvias. for 11mA.  2012-03-14 SD*/
+			case SND_SOC_DAPM_POST_PMD :
+				sitar_codec_enable_ldo_h(w, kcontrol, event);
+				sitar_codec_enable_micbias(w, kcontrol, event);
+				break;
+         }
+        return 0;
+}
+#endif
 
 static void tx_hpf_corner_freq_callback(struct work_struct *work)
 {
@@ -2149,6 +2297,54 @@ static int sitar_codec_reset_interpolator(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+#ifdef CONFIG_SWITCH_FSA8008
+static void sitar_enable_ldo_h(struct snd_soc_codec *codec, u32  enable)
+{
+
+    struct sitar_priv *sitar = snd_soc_codec_get_drvdata(codec);
+
+	if (enable) {
+//                                                                  
+// In this area, Card->Mutex Doesn't need and it makes out of order Mutex Structure
+//		mutex_lock(&codec->card->mutex);
+		sitar->ldo_h_count++;
+		if (sitar->ldo_h_count == 1)
+			snd_soc_update_bits(codec, SITAR_A_LDO_H_MODE_1,
+				0x80, 0x80);
+//		mutex_unlock(&codec->card->mutex);
+		pr_debug( "tabla_enable_ldo_h : en[%d], cnt[%d]\n", enable, sitar->ldo_h_count);
+	} else {
+//		mutex_lock(&codec->card->mutex);
+		sitar->ldo_h_count--;
+		if (!sitar->ldo_h_count)
+			snd_soc_update_bits(codec, SITAR_A_LDO_H_MODE_1,
+				0x80, 0x00);
+//		mutex_unlock(&codec->card->mutex);
+		pr_debug( "tabla_enable_ldo_h : en[%d], cnt[%d]\n", enable, sitar->ldo_h_count);
+	}
+//                    
+}
+
+static int sitar_codec_enable_ldo_h(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *kcontrol, int event)
+{
+    struct snd_soc_codec *codec = w->codec;
+    pr_debug("%s %d\n", __func__, event);
+
+    switch (event) {
+	case SND_SOC_DAPM_POST_PMU:
+    case SND_SOC_DAPM_PRE_PMU:
+        sitar_enable_ldo_h(codec, 1);
+        usleep_range(1000, 1000);
+        break;
+	case SND_SOC_DAPM_POST_PMD:
+        sitar_enable_ldo_h(codec, 0);
+		usleep_range(1000, 1000);
+		break;
+	}
+	return 0;
+}
+#else
 static int sitar_codec_enable_ldo_h(struct snd_soc_dapm_widget *w,
 	struct snd_kcontrol *kcontrol, int event)
 {
@@ -2161,7 +2357,7 @@ static int sitar_codec_enable_ldo_h(struct snd_soc_dapm_widget *w,
 	}
 	return 0;
 }
-
+#endif 
 static void sitar_enable_rx_bias(struct snd_soc_codec *codec, u32  enable)
 {
 	struct sitar_priv *sitar = snd_soc_codec_get_drvdata(codec);
@@ -2340,8 +2536,10 @@ static int sitar_hph_pa_event(struct snd_soc_dapm_widget *w,
 
 		pr_debug("%s: sleep 10 ms after %s PA disable.\n", __func__,
 				w->name);
-		usleep_range(10000, 10000);
-
+//                                                                                      
+		usleep_range(16000, 16000);
+		//usleep_range(10000, 10000);
+//                                           
 		if (sitar_is_line_pa_on(codec))
 			sitar_enable_classg(codec, true);
 		else
@@ -2421,6 +2619,7 @@ static int sitar_codec_enable_charge_pump(struct snd_soc_dapm_widget *w,
 	return 0;
 }
 
+#if 0  /*                                      */
 static int sitar_ear_pa_event(struct snd_soc_dapm_widget *w,
 		struct snd_kcontrol *kcontrol, int event)
 {
@@ -2438,6 +2637,7 @@ static int sitar_ear_pa_event(struct snd_soc_dapm_widget *w,
 	}
 	return 0;
 }
+#endif /* #if 0 */
 
 static const struct snd_soc_dapm_widget sitar_dapm_i2s_widgets[] = {
 	SND_SOC_DAPM_SUPPLY("RX_I2S_CLK", SITAR_A_CDC_CLK_RX_I2S_CTL,
@@ -2450,11 +2650,26 @@ static const struct snd_soc_dapm_widget sitar_dapm_widgets[] = {
 	/*RX stuff */
 	SND_SOC_DAPM_OUTPUT("EAR"),
 
+#if defined(CONFIG_LGE_AUDIO) /*          */
+	/*                 
+                              
+                                                                     
+  */
+	SND_SOC_DAPM_PGA_E("EAR PA", SND_SOC_NOPM, 0, 0, NULL,
+			0, sitar_ear_pa_event, SND_SOC_DAPM_PRE_PMU |
+			SND_SOC_DAPM_PRE_PMD),
+
+	SND_SOC_DAPM_MIXER("DAC1", SND_SOC_NOPM, 0, 0, dac1_switch,
+		ARRAY_SIZE(dac1_switch)),
+#else /* Qualcomm original code */
 	SND_SOC_DAPM_PGA_E("EAR PA", SITAR_A_RX_EAR_EN, 4, 0, NULL, 0,
 				sitar_ear_pa_event, SND_SOC_DAPM_POST_PMU |
 				SND_SOC_DAPM_POST_PMD),
 	SND_SOC_DAPM_MIXER("DAC1", SITAR_A_RX_EAR_EN, 6, 0, dac1_switch,
 		ARRAY_SIZE(dac1_switch)),
+#endif
+	/*                      */
+
 	SND_SOC_DAPM_SUPPLY("EAR DRIVER", SITAR_A_RX_EAR_EN, 3, 0, NULL, 0),
 	SND_SOC_DAPM_AIF_IN_E("SLIM RX1", "AIF1 Playback", 0, SND_SOC_NOPM, 0,
 				0, sitar_codec_enable_slimrx,
@@ -2549,13 +2764,24 @@ static const struct snd_soc_dapm_widget sitar_dapm_widgets[] = {
 	SND_SOC_DAPM_SUPPLY("RX_BIAS", SND_SOC_NOPM, 0, 0,
 		sitar_codec_enable_rx_bias, SND_SOC_DAPM_PRE_PMU |
 		SND_SOC_DAPM_POST_PMD),
-
-	SND_SOC_DAPM_SUPPLY("LDO_H", SITAR_A_LDO_H_MODE_1, 7, 0,
-		sitar_codec_enable_ldo_h, SND_SOC_DAPM_POST_PMU),
+//                                         
+//	SND_SOC_DAPM_SUPPLY("LDO_H", SITAR_A_LDO_H_MODE_1, 7, 0,
+//		sitar_codec_enable_ldo_h, SND_SOC_DAPM_POST_PMU),
+//                       
 	/* TX */
 
 	SND_SOC_DAPM_SUPPLY("CDC_CONN", SITAR_A_CDC_CLK_OTHR_CTL, 2, 0, NULL,
 		0),
+
+#ifdef CONFIG_SWITCH_FSA8008
+	SND_SOC_DAPM_SUPPLY("LDO_H", SND_SOC_NOPM, 0, 0,
+		sitar_codec_enable_ldo_h, SND_SOC_DAPM_PRE_PMU |
+		SND_SOC_DAPM_POST_PMD),
+#else
+	SND_SOC_DAPM_SUPPLY("LDO_H", SITAR_A_LDO_H_MODE_1, 7, 0,
+		sitar_codec_enable_ldo_h, SND_SOC_DAPM_POST_PMU),
+#endif
+
 	SND_SOC_DAPM_INPUT("AMIC1"),
 	SND_SOC_DAPM_INPUT("AMIC2"),
 	SND_SOC_DAPM_INPUT("AMIC3"),
@@ -2569,6 +2795,11 @@ static const struct snd_soc_dapm_widget sitar_dapm_widgets[] = {
 	SND_SOC_DAPM_MICBIAS_E("MIC BIAS2 External", SITAR_A_MICB_2_CTL, 7, 0,
 		sitar_codec_enable_micbias, SND_SOC_DAPM_PRE_PMU |
 		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
+#ifdef CONFIG_SWITCH_FSA8008
+	SND_SOC_DAPM_MICBIAS_E("MIC BIAS2 Power External", SITAR_A_MICB_2_CTL, 7, 0,
+		sitar_codec_enable_micbias_power, SND_SOC_DAPM_PRE_PMU |
+		SND_SOC_DAPM_POST_PMU |	SND_SOC_DAPM_POST_PMD),
+#endif
 	SND_SOC_DAPM_MICBIAS_E("MIC BIAS2 Internal1", SITAR_A_MICB_2_CTL, 7, 0,
 		sitar_codec_enable_micbias, SND_SOC_DAPM_PRE_PMU |
 		SND_SOC_DAPM_POST_PMU | SND_SOC_DAPM_POST_PMD),
@@ -2960,9 +3191,20 @@ static void sitar_codec_enable_audio_mode_bandgap(struct snd_soc_codec *codec)
 {
 	struct wcd9xxx *sitar_core = dev_get_drvdata(codec->dev->parent);
 
+
+#if defined(CONFIG_LGE_AUDIO)  //Headset_MicBias_2_7V
+	snd_soc_update_bits(codec, SITAR_A_LDO_H_MODE_1, 0x0C, 0x0C);	
+#elif defined(CONFIG_MACH_MSM8930_LGPS9) || defined(CONFIG_MACH_MSM8930_FX3)
+	snd_soc_update_bits(codec, SITAR_A_LDO_H_MODE_1, 0x0C, 0x04);	
+#endif
+
+//                        
 	if (SITAR_IS_1P0(sitar_core->version))
 		snd_soc_update_bits(codec, SITAR_A_LDO_H_MODE_1, 0x80, 0x80);
-
+    else
+		snd_soc_update_bits(codec, SITAR_A_LDO_H_MODE_1, 0x80, 0x80);
+//                       
+    
 	snd_soc_update_bits(codec, SITAR_A_BIAS_CURR_CTL_2, 0x0C, 0x08);
 	usleep_range(1000, 1000);
 	snd_soc_write(codec, SITAR_A_BIAS_REF_CTL, 0x1C);
@@ -2977,6 +3219,106 @@ static void sitar_codec_enable_audio_mode_bandgap(struct snd_soc_codec *codec)
 		0x00);
 }
 
+
+#ifdef CONFIG_SWITCH_FSA8008
+static void sitar_codec_enable_bandgap(struct snd_soc_codec *codec,
+	enum sitar_bandgap_type choice)
+{
+	struct sitar_priv *sitar = snd_soc_codec_get_drvdata(codec);
+	struct wcd9xxx *sitar_core = dev_get_drvdata(codec->dev->parent);
+      	static int value;
+
+	value = gpio_get_value_cansleep(GPIO_EAR_SENSE_N);
+
+	if (!value)
+		pr_debug("===> Headset inserted. \n");
+	else
+		pr_debug("===> Headset removed.\n");
+
+	/* TODO lock resources accessed by audio streams and threaded
+	 * interrupt handlers
+	 */
+
+    	pr_debug("%s, choice is %d, current is %d audio_band_gap_cnt %d\n",
+        __func__, choice, sitar->bandgap_type,
+        sitar->audio_band_gap_cnt);
+
+
+    	if (sitar->bandgap_type == choice) {
+        	if (choice == SITAR_BANDGAP_AUDIO_MODE) {
+            	sitar->audio_band_gap_cnt++;
+			pr_debug("audio_band_gap_cnt is increased by current=choice=1.\n");
+       	}
+        	if (choice == SITAR_BANDGAP_MBHC_MODE)
+            	return;
+	}
+
+
+	if ((sitar->bandgap_type == SITAR_BANDGAP_OFF) &&
+		(choice == SITAR_BANDGAP_AUDIO_MODE)) {
+		sitar->audio_band_gap_cnt++;
+		sitar_codec_enable_audio_mode_bandgap(codec);
+		pr_debug("audio_band_gap_cnt is increased by current=0 && choice=1.\n");
+	} else if (choice == SITAR_BANDGAP_MBHC_MODE) {
+		snd_soc_update_bits(codec, SITAR_A_BIAS_CURR_CTL_2, 0x0C, 0x08);
+		snd_soc_update_bits(codec, SITAR_A_BIAS_CENTRAL_BG_CTL, 0x2,
+			0x2);
+		snd_soc_update_bits(codec, SITAR_A_BIAS_CENTRAL_BG_CTL, 0x80,
+			0x80);
+		snd_soc_update_bits(codec, SITAR_A_BIAS_CENTRAL_BG_CTL, 0x4,
+			0x4);
+		snd_soc_update_bits(codec, SITAR_A_BIAS_CENTRAL_BG_CTL, 0x01,
+			0x01);
+		usleep_range(1000, 1000);
+		snd_soc_update_bits(codec, SITAR_A_BIAS_CENTRAL_BG_CTL, 0x80,
+			0x00);
+	} else if ((sitar->bandgap_type == SITAR_BANDGAP_MBHC_MODE) &&
+		(choice == SITAR_BANDGAP_AUDIO_MODE)) {
+		sitar->audio_band_gap_cnt++;
+		snd_soc_write(codec, SITAR_A_BIAS_CENTRAL_BG_CTL, 0x00);
+		pr_debug("audio_band_gap_cnt is increased by current=2 && choice=1.\n");
+		usleep_range(100, 100);
+		sitar_codec_enable_audio_mode_bandgap(codec);
+	} else if (choice == SITAR_BANDGAP_OFF) {
+        	if (sitar->audio_band_gap_cnt == 0) {
+            		pr_err("%s: Error, bandgap count is already zero\n", __func__);
+            	} else {
+                 	sitar->audio_band_gap_cnt--;
+				 pr_debug("audio_band_gap_cnt is decreased by choice=0.\n");
+                  	if (!sitar->audio_band_gap_cnt){
+				  /*                                                                               
+                             
+      */
+#if 0
+				if(value) {
+		                  	snd_soc_write(codec, SITAR_A_BIAS_CENTRAL_BG_CTL, 0x50);
+						pr_debug("Reg write to SITAR_A_BIAS_CENTRAL_BG_CTL\n");
+			        	} else {
+			        		pr_debug("===> snd_soc_write is skipped by Headset.\n");
+	        		}
+#else
+				if(value) {
+					snd_soc_update_bits(codec, SITAR_A_BIAS_CURR_CTL_2, 0x0C, 0x00);
+					snd_soc_write(codec, SITAR_A_BIAS_CENTRAL_BG_CTL, 0x50);
+                        		if (SITAR_IS_1P0(sitar_core->version))
+                            		snd_soc_update_bits(codec, SITAR_A_LDO_H_MODE_1,0xFF, 0x65);
+                        		else
+                            		snd_soc_update_bits(codec, SITAR_A_LDO_H_MODE_1,0xFF, 0x65);
+                        		usleep_range(1000, 1000);
+					pr_debug("Reg write to SITAR_A_BIAS_CENTRAL_BG_CTL\n");
+				} else {
+					pr_debug("===> snd_soc_write is skipped by Headset.\n");
+				}	
+#endif
+                  	}
+                 }
+	} else {
+		pr_err("%s: Error, Invalid bandgap settings\n", __func__);
+	}
+	sitar->bandgap_type = choice;
+    pr_debug("%s. audio_band_gap_cnt %d\n",__func__,sitar->audio_band_gap_cnt);
+}
+#else
 static void sitar_codec_enable_bandgap(struct snd_soc_codec *codec,
 	enum sitar_bandgap_type choice)
 {
@@ -3032,6 +3374,7 @@ static void sitar_codec_enable_bandgap(struct snd_soc_codec *codec,
 	}
 	sitar->bandgap_type = choice;
 }
+#endif
 
 static int sitar_codec_enable_config_mode(struct snd_soc_codec *codec,
 	int enable)
@@ -3229,6 +3572,69 @@ int sitar_mclk_enable(struct snd_soc_codec *codec, int mclk_enable, bool dapm)
 {
 	struct sitar_priv *sitar = snd_soc_codec_get_drvdata(codec);
 
+#ifdef CONFIG_SWITCH_FSA8008
+//	pr_debug("%s() mclk_enable = %u\n", __func__, mclk_enable);
+	pr_debug("%s() mclk_bandgap_state = %u. mbhc_polling_active = %u\n",
+        __func__, mclk_enable, sitar->mbhc_polling_active);
+
+	if (dapm)
+		SITAR_ACQUIRE_LOCK(sitar->codec_resource_lock);
+
+	if (mclk_enable == MCLK_ON_BANDGAP_ON ) {
+		sitar->mclk_enabled = true;
+
+		if (sitar->mbhc_polling_active && (sitar->mclk_enabled)) {
+			sitar_codec_pause_hs_polling(codec);
+			sitar_codec_enable_bandgap(codec,
+					SITAR_BANDGAP_AUDIO_MODE);
+			sitar_codec_enable_clock_block(codec, 0);
+			sitar_codec_calibrate_hs_polling(codec);
+			sitar_codec_start_hs_polling(codec);
+		} else {
+			sitar_codec_enable_bandgap(codec,
+					SITAR_BANDGAP_AUDIO_MODE);
+			sitar_codec_enable_clock_block(codec, 0);
+		}
+	} else if (mclk_enable == MCLK_OFF_BANDGAP_OFF){
+
+		if (!sitar->mclk_enabled) {
+			/*                                                                               */ 
+			if (dapm)
+				SITAR_RELEASE_LOCK(sitar->codec_resource_lock);
+			/*              */
+			pr_err("Error, MCLK already diabled\n");
+			return -EINVAL;
+		}
+		sitar->mclk_enabled = false;
+
+		if (sitar->mbhc_polling_active) {
+			if (!sitar->mclk_enabled) {
+				sitar_codec_pause_hs_polling(codec);
+				sitar_codec_enable_bandgap(codec,
+					SITAR_BANDGAP_MBHC_MODE);
+				sitar_enable_rx_bias(codec, 1);
+				sitar_codec_enable_clock_block(codec, 1);
+				sitar_codec_calibrate_hs_polling(codec);
+				sitar_codec_start_hs_polling(codec);
+			}
+			snd_soc_update_bits(codec, SITAR_A_CLK_BUFF_EN1,
+					0x05, 0x01);
+		} else {
+			sitar_codec_disable_clock_block(codec);
+			sitar_codec_enable_bandgap(codec,
+				SITAR_BANDGAP_OFF);
+		}
+	} else if (mclk_enable == MCLK_OF_BANDGAP_ON) {
+		sitar->mclk_enabled = false;
+		sitar_codec_disable_clock_block(codec);
+	}
+
+	if (dapm)
+		SITAR_RELEASE_LOCK(sitar->codec_resource_lock);
+
+	return 0;
+
+#else
 	pr_debug("%s() mclk_enable = %u\n", __func__, mclk_enable);
 
 	if (dapm)
@@ -3280,6 +3686,7 @@ int sitar_mclk_enable(struct snd_soc_codec *codec, int mclk_enable, bool dapm)
 	if (dapm)
 		SITAR_RELEASE_LOCK(sitar->codec_resource_lock);
 	return 0;
+#endif
 }
 
 static int sitar_set_dai_sysclk(struct snd_soc_dai *dai,
@@ -3804,6 +4211,30 @@ static int sitar_codec_enable_slimtx(struct snd_soc_dapm_widget *w,
 	return ret;
 }
 
+/*                 
+                             
+                                                                    
+ */
+static int sitar_ear_pa_event(struct snd_soc_dapm_widget *w,
+	struct snd_kcontrol *kcontrol, int event)
+{
+	struct snd_soc_codec *codec = w->codec;
+
+	pr_debug("%s %d\n", __func__, event);
+
+	switch (event) {
+	case SND_SOC_DAPM_PRE_PMU:
+		snd_soc_update_bits(codec, SITAR_A_RX_EAR_EN, 0x50, 0x50);
+		break;
+
+	case SND_SOC_DAPM_PRE_PMD:
+		snd_soc_update_bits(codec, SITAR_A_RX_EAR_EN, 0x10, 0x00);
+		snd_soc_update_bits(codec,SITAR_A_RX_EAR_EN, 0x40, 0x00);
+		break;
+	}
+	return 0;
+}
+/*                      */
 
 static short sitar_codec_read_sta_result(struct snd_soc_codec *codec)
 {
@@ -4390,6 +4821,16 @@ static bool sitar_mbhc_fw_validate(const struct firmware *fw)
 
 	return true;
 }
+
+#ifdef CONFIG_SWITCH_FSA8008
+void sitar_register_mclk_call_back(struct snd_soc_codec *codec,
+    int (*mclk_cb_fn) (struct snd_soc_codec *codec, int , bool ))
+{
+        struct sitar_priv *sitar = snd_soc_codec_get_drvdata(codec);;
+        sitar->mbhc_cfg.mclk_cb_fn = mclk_cb_fn;
+}
+EXPORT_SYMBOL_GPL(sitar_register_mclk_call_back);
+#endif
 
 
 static void sitar_turn_onoff_override(struct snd_soc_codec *codec, bool on)
@@ -5113,6 +5554,20 @@ int sitar_hs_detect(struct snd_soc_codec *codec,
 	sitar->current_plug = PLUG_TYPE_NONE;
 	sitar->lpi_enabled = false;
 	sitar_get_mbhc_micbias_regs(codec, &sitar->mbhc_bias_regs);
+
+#ifdef CONFIG_LGE_AUDIO_MBHC_SDEV
+	/*                 
+                                  
+                                                   
+  */
+
+	/* initialize switch device */
+	sitar->sdev.name	= "h2w";
+	sitar->sdev.print_state = lge_hsd_print_state;
+	sitar->sdev.print_name = lge_hsd_print_name;
+	if (switch_dev_register(&sitar->sdev))
+		kfree(&sitar->sdev);
+#endif
 
 	/* Put CFILT in fast mode by default */
 	snd_soc_update_bits(codec, sitar->mbhc_bias_regs.cfilt_ctl,
@@ -5915,6 +6370,48 @@ static void sitar_codec_init_reg(struct snd_soc_codec *codec)
 			sitar_codec_reg_init_val[i].mask,
 			sitar_codec_reg_init_val[i].val);
 }
+#ifdef CONFIG_SWITCH_FSA8008
+/*
+                               
+                                                             
+                                   
+*/
+struct snd_soc_codec *snd_codec = NULL;
+
+/*                                  */
+// #define SITAR_REG_DEBUG
+
+void sitar_codec_micbias2_ctl(int enable)
+{
+	struct snd_soc_codec *codec = NULL;
+
+	if (snd_codec == NULL) {
+		pr_err("%s, Failed to init tabla codec\n", __func__);
+		return;
+	}
+
+	codec = snd_codec;
+	pr_info("%s, enable : %d\n", __func__ , enable);
+
+	if(enable){
+		mutex_lock(&codec->mutex);
+		snd_soc_dapm_force_enable_pin(&codec->dapm, "MIC BIAS2 Power External");
+		snd_soc_dapm_sync(&codec->dapm);
+		mutex_unlock(&codec->mutex);
+		pr_debug("After calling the snd_soc_dapm_enable_pin \n");
+	} else {
+		mutex_lock(&codec->mutex);
+		//                                                                                                      
+		snd_soc_update_bits(codec, SITAR_A_TX_1_2_EN, 0x0F, 0x00);
+		//                                             
+		snd_soc_dapm_disable_pin(&codec->dapm, "MIC BIAS2 Power External");
+		snd_soc_dapm_sync(&codec->dapm);
+		mutex_unlock(&codec->mutex);
+		pr_debug("After calling the snd_soc_dapm_disable_pin \n");
+	}
+}
+EXPORT_SYMBOL_GPL(sitar_codec_micbias2_ctl);
+#endif /* CONFIG_SWITCH_FSA8008 */
 
 static int sitar_codec_probe(struct snd_soc_codec *codec)
 {
@@ -5970,6 +6467,15 @@ static int sitar_codec_probe(struct snd_soc_codec *codec)
 	sitar->pdata = dev_get_platdata(codec->dev->parent);
 	sitar_update_reg_defaults(codec);
 	sitar_codec_init_reg(codec);
+
+#ifdef CONFIG_SWITCH_FSA8008
+	sitar->ldo_h_count = 0;
+	sitar->audio_band_gap_cnt = 0;
+//                                                                  
+// In this area, Card->Mutex Doesn't need and it makes Out of order  Mutex Structure
+	//mutex_init(&sitar->codec->card->mutex);
+#endif
+
 	sitar->intf_type = wcd9xxx_get_intf_type();
 	if (sitar->intf_type == WCD9XXX_INTERFACE_TYPE_I2C)
 		sitar_i2c_codec_init_reg(codec);
@@ -6005,6 +6511,9 @@ static int sitar_codec_probe(struct snd_soc_codec *codec)
 
 	snd_soc_dapm_sync(dapm);
 
+#ifdef CONFIG_SWITCH_FSA8008
+	if(lge_get_board_usembhc()) {
+#endif
 
 	ret = wcd9xxx_request_irq(codec->control_data, SITAR_IRQ_MBHC_INSERTION,
 		sitar_hs_insert_irq, "Headset insert detect", sitar);
@@ -6038,6 +6547,9 @@ static int sitar_codec_probe(struct snd_soc_codec *codec)
 			SITAR_IRQ_MBHC_RELEASE);
 		goto err_release_irq;
 	}
+#ifdef CONFIG_SWITCH_FSA8008
+	}
+#endif
 
 	ret = wcd9xxx_request_irq(codec->control_data, SITAR_IRQ_SLIMBUS,
 		sitar_slimbus_irq, "SLIMBUS Slave", sitar);
@@ -6101,6 +6613,9 @@ static int sitar_codec_probe(struct snd_soc_codec *codec)
 	debug_sitar_priv = sitar;
 #endif
 
+#ifdef CONFIG_SWITCH_FSA8008
+	snd_codec = codec;   //                                                                        
+#endif
 	return ret;
 
 err_hphr_ocp_irq:
@@ -6143,6 +6658,11 @@ static int sitar_codec_remove(struct snd_soc_codec *codec)
 	sitar_codec_disable_clock_block(codec);
 	SITAR_RELEASE_LOCK(sitar->codec_resource_lock);
 	sitar_codec_enable_bandgap(codec, SITAR_BANDGAP_OFF);
+#ifdef CONFIG_SWITCH_FSA8008
+//                                                                  
+// In this area, Card->Mutex Doesn't need and it makes Out of order  Mutex Structure
+//	mutex_destroy(&sitar->codec->card->mutex);
+#endif
 	if (sitar->mbhc_fw)
 		release_firmware(sitar->mbhc_fw);
 	for (i = 0; i < ARRAY_SIZE(sitar_dai); i++)

@@ -567,6 +567,13 @@ int vpe_enable(uint32_t clk_rate, struct msm_cam_media_controller *mctl)
 		pr_err("%s: Device attach failed\n", __func__);
 		goto dst_attach_failed;
 	}
+/*                                                                  */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+	msm_camera_v4l2_get_ion_client(mctl->pcam_ptr);
+#endif
+#endif
+/*                                                                */
 #endif
 	return rc;
 
@@ -601,6 +608,13 @@ int vpe_disable(struct msm_cam_media_controller *mctl)
 #ifdef CONFIG_MSM_IOMMU
 	iommu_detach_device(mctl->domain, vpe_ctrl->iommu_ctx_dst);
 	iommu_detach_device(mctl->domain, vpe_ctrl->iommu_ctx_src);
+/*                                                                  */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+	msm_camera_v4l2_put_ion_client(mctl->pcam_ptr);
+#endif
+#endif	
+/*                                                                */
 #endif
 	disable_irq(vpe_ctrl->vpeirq->start);
 	tasklet_kill(&vpe_tasklet);
@@ -1019,8 +1033,15 @@ static int msm_vpe_subdev_close(struct v4l2_subdev *sd,
 			frame_info->p_mctl->client, mctl->domain_num);
 		msm_mctl_unmap_user_frame(&frame_info->dest_frame,
 			frame_info->p_mctl->client, mctl->domain_num);
+/*                                                                                              */
+//                                                                               
+// Because of this, getting VT during the video capture always goes to Kernel Crash.
+
+            kfree(frame_info);
+            vpe_ctrl->pp_frame_info = NULL;
+//                                                                               
+/*                                                                                              */
 	}
-	vpe_ctrl->pp_frame_info = NULL;
 	/* Drain the payload queue. */
 	msm_queue_drain(&vpe_ctrl->eventData_q, list_eventdata);
 	atomic_dec(&vpe_ctrl->active);

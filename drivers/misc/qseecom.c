@@ -447,6 +447,12 @@ static int qseecom_unregister_listener(struct qseecom_dev_handle *data)
 		struct qseecom_registered_listener_list *svc;
 
 		svc = __qseecom_find_svc(data->listener.id);
+		/*                                      */
+		if (svc == NULL) {
+			pr_err("svc does not exist\n");
+			return -EINVAL;
+		}
+		/*             */
 		sb_init_req.pr_cmd = TZ_SCHED_CMD_ID_REGISTER_LISTENER;
 		sb_init_req.listener_id = data->listener.id;
 		sb_init_req.sb_len = 0;

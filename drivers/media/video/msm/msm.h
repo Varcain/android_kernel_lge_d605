@@ -16,6 +16,17 @@
 
 #ifdef __KERNEL__
 
+/*                                                                  */
+#if defined(CONFIG_MACH_MSM8930_FX3)\
+ || defined(CONFIG_MACH_APQ8064_GKKT)\
+ || defined(CONFIG_MACH_APQ8064_GKSK)\
+ || defined(CONFIG_MACH_APQ8064_GKU)\
+ || defined(CONFIG_MACH_APQ8064_GKATT)\
+ || defined (CONFIG_MACH_APQ8064_GVDCM)
+#define LGE_GK_CAMERA_BSP
+#endif
+/*                                                                */
+
 /* Header files */
 #include <linux/i2c.h>
 #include <linux/videodev2.h>
@@ -154,11 +165,14 @@ struct rdi_count_msg {
 
 /* message id for v4l2_subdev_notify*/
 enum msm_camera_v4l2_subdev_notify {
+	NOTIFY_CID_CHANGE, /*                                          */
 	NOTIFY_ISP_MSG_EVT, /* arg = enum ISP_MESSAGE_ID */
 	NOTIFY_VFE_MSG_OUT, /* arg = struct isp_msg_output */
 	NOTIFY_VFE_MSG_STATS,  /* arg = struct isp_msg_stats */
 	NOTIFY_VFE_MSG_COMP_STATS, /* arg = struct msm_stats_buf */
 	NOTIFY_VFE_BUF_EVT, /* arg = struct msm_vfe_resp */
+	NOTIFY_VFE_ERROR, //QCT patch, Fix_IOMMU_and_VFE_bus_overflow, 2012-10-20, freeso.kim
+	NOTIFY_ISPIF_STREAM, /* arg = enable parameter for s_stream */
 	NOTIFY_VFE_CAMIF_ERROR,
 	NOTIFY_VFE_PIX_SOF_COUNT, /*arg = int*/
 	NOTIFY_AXI_RDI_SOF_COUNT, /*arg = struct rdi_count_msg*/
@@ -324,6 +338,7 @@ struct msm_cam_media_controller {
 	uint32_t ping_imem_cbcr;
 	uint32_t pong_imem_y;
 	uint32_t pong_imem_cbcr;
+	uint8_t hardware_running; /*                                                                            */	
 
 	/*IOMMU domain for this session*/
 	int domain_num;
@@ -368,6 +383,9 @@ struct msm_cam_v4l2_dev_inst {
 	uint8_t avtimerOn;
 	void __iomem *p_avtimer_msw;
 	void __iomem *p_avtimer_lsw;
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GK_KR) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+	int is_closing;
+#endif
 };
 
 struct msm_cam_mctl_node {
@@ -411,6 +429,16 @@ struct msm_cam_v4l2_device {
 
 	struct msm_device_queue eventData_q; /*payload for events sent to app*/
 	struct mutex event_lock;
+
+/*                                                                  */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+	spinlock_t ion_lock;
+	struct ion_client *client;
+	struct kref refcount;
+#endif
+#endif
+/*                                                                */
 };
 
 static inline struct msm_cam_v4l2_device *to_pcam(
@@ -436,6 +464,11 @@ struct msm_cam_config_dev {
 	int dev_num;
 	int domain_num;
 	struct iommu_domain *domain;
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+	struct msm_cam_v4l2_device *pcam;
+#endif
+#endif
 };
 
 struct msm_cam_subdev_info {
@@ -603,6 +636,16 @@ struct msm_cam_server_dev {
     /*IOMMU domain (Page table)*/
 	int domain_num;
 	struct iommu_domain *domain;
+
+/*                                                                   */
+#if defined(CONFIG_MACH_MSM8930_FX3) ||  defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+	struct task_struct	*prev_task;
+	wait_queue_head_t ft_wq;
+	unsigned long	wait_ft_timeout;
+	spinlock_t	ft_spin;
+#endif
+/*                                                                 */
+
 };
 
 enum msm_cam_buf_lookup_type {
@@ -746,6 +789,20 @@ int msm_mctl_pp_get_vpe_buf_info(struct msm_mctl_pp_frame_info *zoom);
 void msm_queue_init(struct msm_device_queue *queue, const char *name);
 void msm_enqueue(struct msm_device_queue *queue, struct list_head *entry);
 void msm_drain_eventq(struct msm_device_queue *queue);
+int get_server_use_count(void); /*                                                                            */
+//                                                                                          
+void msm_cam_stop_hardware(struct msm_cam_v4l2_device *pcam);
+//                                                                                        
+
+/*                                                                  */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+void msm_camera_v4l2_release_ion_client(struct kref *ref);
+struct ion_client *msm_camera_v4l2_get_ion_client(struct msm_cam_v4l2_device *pcam);
+int msm_camera_v4l2_put_ion_client(struct msm_cam_v4l2_device *pcam);
+#endif
+#endif
+/*                                                                */
 #endif /* __KERNEL__ */
 
 #endif /* _MSM_H */

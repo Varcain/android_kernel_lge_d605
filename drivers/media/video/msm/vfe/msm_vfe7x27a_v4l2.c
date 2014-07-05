@@ -1017,6 +1017,11 @@ static void vfe_7x_ops(void *driver_data, unsigned id, size_t len,
 				struct vfe_error_msg *VFE_ErrorMessageBuffer
 					= data;
 				ptr = data;
+//QCT patch S, Fix_IOMMU_and_VFE_bus_overflow, 2012-10-20, freeso.kim				
+				if (VFE_ErrorMessageBuffer->camif_error)
+					v4l2_subdev_notify(&vfe2x_ctrl->subdev,
+						NOTIFY_VFE_ERROR, (void *)NULL);
+//QCT patch E, Fix_IOMMU_and_VFE_bus_overflow, 2012-10-20, freeso.kim
 				CDBG("Error: %x %x\n", ptr[0], ptr[1]);
 				CDBG("CAMIF_Error              = %d\n",
 					VFE_ErrorMessageBuffer->camif_error);

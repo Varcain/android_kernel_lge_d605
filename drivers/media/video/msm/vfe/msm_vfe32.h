@@ -1044,6 +1044,11 @@ struct axi_ctrl_t {
 	struct device *iommu_ctx_imgwr;
 	struct device *iommu_ctx_misc;
 	uint32_t simultaneous_sof_frame;
+/*                                                                       */
+#ifdef LGE_GK_CAMERA_BSP
+	struct mutex state_mutex;
+#endif
+/*                                                                       */
 };
 
 struct vfe32_ctrl_type {

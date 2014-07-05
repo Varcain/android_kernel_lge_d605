@@ -3,6 +3,8 @@
 #
 menu "Inertial measurement units"
 
+source "drivers/staging/iio/imu/inv_mpu/Kconfig"
+
 config ADIS16400
 	tristate "Analog Devices ADIS16400 and similar IMU SPI driver"
 	depends on SPI

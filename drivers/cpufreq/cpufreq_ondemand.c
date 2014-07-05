@@ -25,6 +25,9 @@
 #include <linux/input.h>
 #include <linux/workqueue.h>
 #include <linux/slab.h>
+#if defined(CONFIG_MACH_LGE_L9II_COMMON)
+#include <linux/earlysuspend.h>
+#endif 
 
 /*
  * dbs is used in this file as a shortform for demandbased switching
@@ -55,6 +58,17 @@
 #define MIN_SAMPLING_RATE_RATIO			(2)
 
 static unsigned int min_sampling_rate;
+
+#if defined(CONFIG_MACH_LGE_L9II_COMMON)
+static unsigned int suspended;
+#endif
+
+/*
+                            
+*/
+#ifdef CONFIG_MACH_LGE
+static unsigned long dbs_annoying_timeout = 0;
+#endif
 
 #define LATENCY_MULTIPLIER			(1000)
 #define MIN_LATENCY_MULTIPLIER			(100)
@@ -1018,6 +1032,19 @@ bail_incorrect_governor:
 
 bail_acq_sema_failed:
 	put_online_cpus();
+
+/*
+                            
+                                             
+*/
+#ifdef CONFIG_MACH_LGE
+	{
+		int i;
+		for_each_online_cpu(i)
+			cpufreq_update_policy(i);
+	}
+#endif
+
 	return;
 }
 
@@ -1025,6 +1052,21 @@ static void dbs_input_event(struct input_handle *handle, unsigned int type,
 		unsigned int code, int value)
 {
 	int i;
+
+/*
+                            
+                                      
+                                                     
+*/
+#ifdef CONFIG_MACH_LGE
+	if (code != KEY_POWER && jiffies <= dbs_annoying_timeout && \
+		                      (jiffies + HZ) > dbs_annoying_timeout) {
+		return;
+	} else if (!(strcmp(handle->dev->name, "bma2x2"))) //                                                  
+		return;
+	dbs_annoying_timeout = jiffies + 1;
+#endif
+
 
 	if ((dbs_tuners_ins.powersave_bias == POWERSAVE_BIAS_MAXLEVEL) ||
 		(dbs_tuners_ins.powersave_bias == POWERSAVE_BIAS_MINLEVEL)) {
@@ -1167,6 +1209,13 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		dbs_timer_exit(this_dbs_info);
 
 		mutex_lock(&dbs_mutex);
+
+		#ifdef CONFIG_MACH_LGE
+		/* nothing */
+		#else
+		mutex_destroy(&this_dbs_info->timer_mutex);
+		#endif
+
 		dbs_enable--;
 		/* If device is being removed, policy is no longer
 		 * valid. */
@@ -1181,6 +1230,12 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 		break;
 
 	case CPUFREQ_GOV_LIMITS:
+
+#ifdef CONFIG_MACH_LGE
+	if(!this_dbs_info->cur_policy)
+		return -EINVAL;
+#endif
+
 		mutex_lock(&this_dbs_info->timer_mutex);
 		if (!this_dbs_info->cur_policy) {
 			pr_err("Dbs policy is NULL\n");
@@ -1204,11 +1259,54 @@ static int cpufreq_governor_dbs(struct cpufreq_policy *policy,
 	return 0;
 }
 
+#if defined(CONFIG_MACH_LGE_L9II_COMMON)
+unsigned int prev_sampling_rate;
+int prev_powersave_bias;
+
+static void ondemand_early_suspend(struct early_suspend *handler)
+{	
+	if (suspended) // disable behavior for sleep_ideal_freq==0		
+		return;	
+	suspended = 1;	
+	
+	prev_sampling_rate = dbs_tuners_ins.sampling_rate;
+	prev_powersave_bias = dbs_tuners_ins.powersave_bias;
+	dbs_tuners_ins.sampling_rate *= 4;
+    dbs_tuners_ins.powersave_bias = 100;
+}
+
+static void ondemand_late_resume(struct early_suspend *handler) 
+{	
+	if (!suspended) // already not suspended so nothing to do		
+		return;	
+	suspended = 0;	
+
+	dbs_tuners_ins.sampling_rate = prev_sampling_rate;
+	dbs_tuners_ins.powersave_bias = prev_powersave_bias;
+}
+
+static struct early_suspend ondemand_power_suspend = {
+	.suspend = ondemand_early_suspend,
+	.resume = ondemand_late_resume,
+	.level = EARLY_SUSPEND_LEVEL_DISABLE_FB + 1,
+};
+#endif
+
 static int __init cpufreq_gov_dbs_init(void)
 {
 	u64 idle_time;
 	unsigned int i;
 	int cpu = get_cpu();
+
+	/*                              */
+	#ifdef CONFIG_MACH_LGE
+	mutex_init(&dbs_mutex);
+	#endif
+	/*              */
+
+#if defined(CONFIG_MACH_LGE_L9II_COMMON)
+	suspended = 0;
+#endif
 
 	idle_time = get_cpu_idle_time_us(cpu, NULL);
 	put_cpu();
@@ -1240,6 +1338,10 @@ static int __init cpufreq_gov_dbs_init(void)
 		mutex_init(&this_dbs_info->timer_mutex);
 		INIT_WORK(&per_cpu(dbs_refresh_work, i), dbs_refresh_callback);
 	}
+
+#if defined(CONFIG_MACH_LGE_L9II_COMMON)
+	register_early_suspend(&ondemand_power_suspend);
+#endif
 
 	return cpufreq_register_governor(&cpufreq_gov_ondemand);
 }

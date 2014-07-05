@@ -244,7 +244,10 @@ static void msm_vb2_ops_buf_cleanup(struct vb2_buffer *vb)
 	} else {
 		mem = vb2_plane_cookie(vb, 0);
 		if (!mem)
+		{
+			pr_err("%s:mem is NULL, pcam_inst->vid_fmt.type=%d",__func__, pcam_inst->vid_fmt.type);
 			return;
+		}
 		D("%s: inst=0x%x, buf=0x%x, idx=%d\n", __func__,
 		(uint32_t)pcam_inst, (uint32_t)buf, vb->v4l2_buf.index);
 		vb_phyaddr = (unsigned long) videobuf2_to_pmem_contig(vb, 0);
@@ -269,11 +272,39 @@ static void msm_vb2_ops_buf_cleanup(struct vb2_buffer *vb)
 		buf->state = MSM_BUFFER_STATE_UNUSED;
 		return;
 	}
+/*                                                                              */
+	if (!get_server_use_count() &&
+		pmctl && pmctl->hardware_running) {
+		pr_err("%s: daemon crashed but hardware is still running\n",
+			   __func__);
+		if (pmctl->mctl_release) {
+			pr_err("%s: Releasing now\n", __func__);
+			/*do not send any commands to hardware
+			after reaching this point*/
+			pmctl->mctl_cmd = NULL;
+			pmctl->mctl_release(pmctl);
+			pmctl->mctl_release = NULL;
+			pmctl->hardware_running = 0;
+		}
+		else {
+			pr_err("%s: pmctl release is NULL\n", __func__);
+		}
+	} else {
+		pr_err("server use count %d, pmctl pointer %p, hardware_running %d\n", get_server_use_count(),
+		pmctl, pmctl->hardware_running);
+	}
+/*                                                                              */
 	for (i = 0; i < vb->num_planes; i++) {
 		mem = vb2_plane_cookie(vb, i);
 		if (mem) {
 			videobuf2_pmem_contig_user_put(mem, pmctl->client,
-				pmctl->domain_num);
+				pmctl->domain_num
+/*                                                               */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GK_KR) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+				, pcam_inst->is_closing
+#endif
+/*                                                             */
+				);
 		} else {
 			pr_err("%s Inst %p buffer plane cookie is null",
 				__func__, pcam_inst);
@@ -779,6 +810,13 @@ int msm_mctl_reserve_free_buf(
 					__func__,
 					pcam_inst->buf_offset[buf_idx][i].
 					data_offset, plane_offset);
+				//QCT patch S, Fix_IOMMU_and_VFE_bus_overflow, 2012-10-31, freeso.kim	
+				if (pcam_inst->buf_offset[buf_idx][i].data_offset != 0 || plane_offset != 0) {
+					 pr_err("%s: data offset %d, plane_offset %d\n",
+						 __func__,
+						 pcam_inst->buf_offset[buf_idx][i].data_offset,
+						 plane_offset);
+				}
 				free_buf->ch_paddr[i] =	(uint32_t)
 				videobuf2_to_pmem_contig(&buf->vidbuf, i) +
 				pcam_inst->buf_offset[buf_idx][i].data_offset +
@@ -958,12 +996,18 @@ static void __msm_mctl_unmap_user_frame(struct msm_cam_meta_frame *meta_frame,
 	for (i = 0; i < meta_frame->frame.num_planes; i++) {
 		D("%s Plane %d handle %p", __func__, i,
 			meta_frame->map[i].handle);
+/*                                                                                              */
+	 if (meta_frame->map[i].handle != NULL) {
 		ion_unmap_iommu(client, meta_frame->map[i].handle,
 					domain_num, 0);
 		ion_free(client, meta_frame->map[i].handle);
+		meta_frame->map[i].handle = NULL;
+	}
+	else
+	     WARN(1,"Warnning : %s : This is not normal case\n", __func__);
+/*                                                                                              */
 	}
 }
-
 /* Map using ION APIs */
 static int __msm_mctl_map_user_frame(struct msm_cam_meta_frame *meta_frame,
 	struct ion_client *client, int domain_num)
@@ -992,7 +1036,7 @@ static int __msm_mctl_map_user_frame(struct msm_cam_meta_frame *meta_frame,
 			meta_frame->map[i].handle);
 		if (ion_map_iommu(client, meta_frame->map[i].handle,
 				domain_num, 0, SZ_4K,
-				0, &paddr, &len, 0, 0) < 0) {
+				0, &paddr, &len, 0, ION_IOMMU_UNMAP_DELAYED) < 0) {
 			pr_err("%s: cannot map address plane %d", __func__, i);
 			ion_free(client, meta_frame->map[i].handle);
 			/* Roll back previous plane mappings, if any */

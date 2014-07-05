@@ -26,6 +26,25 @@
 #define V4L2_IDENT_CSIPHY                        50003
 #define CSIPHY_VERSION_V3                        0x10
 
+
+/*                                                                                     */
+/*8x30, csi2.0*/
+
+#ifdef DBG_CSIPHY
+static uint8_t csiphyErrStatus[8][8] =
+{
+/*err_bit, irq_count*/
+	{0x3c, 0},	/*Clk_irq*/
+	{0x6f, 0},	/*Datalane1_irq*/
+	{0x6f, 0},	/*Datalane2_irq*/
+	{0x6f, 0},	/*Datalane3_irq*/
+	{0x6f, 0},	/*Datalane4_irq*/
+	{0x00, 0},	/*ULPM_irq*/
+	{0x13, 0},	/*Voltage_irq*/
+};
+#endif
+/*                                                                                     */
+
 int msm_csiphy_lane_config(struct csiphy_device *csiphy_dev,
 	struct msm_camera_csiphy_params *csiphy_params)
 {
@@ -35,6 +54,21 @@ int msm_csiphy_lane_config(struct csiphy_device *csiphy_dev,
 	uint8_t lane_cnt = 0;
 	uint16_t lane_mask = 0;
 	void __iomem *csiphybase;
+	int i = 0;	/*                                                                                   */
+	
+/*                                                                                                            */
+#ifdef CONFIG_HI543	
+	uint16_t irq2 = 0;
+#endif
+/*                                                                                                            */
+
+
+/*                                                                                     */
+	for(i=0; i<8; i++)
+		memset(&csiphyErrStatus[i][1], 0, sizeof(uint8_t));
+/*                                                                                     */
+
+
 	csiphybase = csiphy_dev->base;
 	if (!csiphybase) {
 		pr_err("%s: csiphybase NULL\n", __func__);
@@ -50,7 +84,8 @@ int msm_csiphy_lane_config(struct csiphy_device *csiphy_dev,
 		return rc;
 	}
 
-	CDBG("%s csiphy_params, mask = %x, cnt = %d, settle cnt = %x\n",
+	/*                                                         */
+	pr_err("%s csiphy_params, mask = %x, cnt = %d, settle cnt = %x\n",
 		__func__,
 		csiphy_params->lane_mask,
 		csiphy_params->lane_cnt,
@@ -96,6 +131,20 @@ int msm_csiphy_lane_config(struct csiphy_device *csiphy_dev,
 		j++;
 		lane_mask >>= 1;
 	}
+
+/*                                                                                                            */
+#ifdef CONFIG_HI543
+	if(csiphy_dev->pdev->id == 0){//only for main cam(hi543)
+		irq2 = msm_camera_io_r(csiphy_dev->base + MIPI_CSIPHY_LNCK_CFG4_ADDR); 
+		pr_err("%s MIPI_CSIPHY_LNCK_CFG4_ADDR = 0x%x\n", __func__, irq2); 
+		
+		msm_camera_io_w(12, csiphy_dev->base + MIPI_CSIPHY_LNCK_CFG4_ADDR); 
+	}else{
+		irq2 = 0;
+	}
+#endif
+/*                                                                                                            */
+
 	msleep(20);
 	return rc;
 }
@@ -116,6 +165,25 @@ static irqreturn_t msm_csiphy_irq(int irq_num, void *data)
 			MIPI_CSIPHY_INTERRUPT_CLEAR0_ADDR + 0x4*i);
 		pr_err("%s MIPI_CSIPHY%d_INTERRUPT_STATUS%d = 0x%x\n",
 			 __func__, csiphy_dev->pdev->id, i, irq);
+/*                                                                                     */
+#ifdef DBG_CSIPHY
+		if(irq & csiphyErrStatus[i][0]){
+			csiphyErrStatus[i][1] += 1;
+			pr_err("%s %d IRQ::error occurence : %d\n", __func__, i, csiphyErrStatus[i][1]);
+		}
+
+		if(csiphyErrStatus[i][1] > 20){
+			pr_err("%s Disable %d IRQ::error occurence %d\n", __func__, i, csiphyErrStatus[i][1]);
+			
+			msm_camera_io_w(0x00, csiphy_dev->base + MIPI_CSIPHY_INTERRUPT_MASK_ADDR  + 0x4*i - 0x4);
+			//msm_camera_io_w(0x00, csiphy_dev->base + MIPI_CSIPHY_INTERRUPT_CLEAR_ADDR + 0x4*i);
+
+			csiphyErrStatus[i][1] = 0;
+		}
+#endif
+/*                                                                                     */
+
+		
 		msm_camera_io_w(0x1, csiphy_dev->base +
 			MIPI_CSIPHY_GLBL_IRQ_CMD_ADDR);
 		msm_camera_io_w(0x0, csiphy_dev->base +
@@ -157,6 +225,9 @@ static struct msm_cam_clk_info csiphy_8974_clk_info[] = {
 static int msm_csiphy_init(struct csiphy_device *csiphy_dev)
 {
 	int rc = 0;
+
+	pr_err("%s \n", __func__); /*                                                        */
+	
 	if (csiphy_dev == NULL) {
 		pr_err("%s: csiphy_dev NULL\n", __func__);
 		rc = -ENOMEM;

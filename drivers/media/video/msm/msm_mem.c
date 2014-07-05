@@ -138,6 +138,9 @@ static int msm_pmem_table_add(struct hlist_head *ptype,
 	if (ion_map_iommu(client, region->handle, domain_num, 0,
 				  SZ_4K, 0, &paddr, &len, 0, 0) < 0)
 		goto out2;
+		//                                                                                   
+		pr_err("%s: IOMMU mapped address is 0x%x\n", __func__, (unsigned int)paddr);
+		//                                                                                 
 #elif CONFIG_ANDROID_PMEM
 	rc = get_pmem_file(info->fd, &paddr, &kvstart, &len, &file);
 	if (rc < 0) {
@@ -253,6 +256,9 @@ static int __msm_pmem_table_del(struct hlist_head *ptype,
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
 				ion_unmap_iommu(client, region->handle,
 					domain_num, 0);
+				//                                                                                   
+				pr_err("%s: IOMMU unmapping address 0x%x\n", __func__, (unsigned int)region->paddr);
+				//                                                                                 
 				ion_free(client, region->handle);
 #else
 				put_pmem_file(region->file);

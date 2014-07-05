@@ -19,7 +19,8 @@
 
 #define PM8XXX_PWM_PERIOD_MIN	7 /* usec: 19.2M, n=6, m=0, pre=2 */
 #define PM8XXX_PWM_PERIOD_MAX	(384 * USEC_PER_SEC) /* 1K, n=9, m=7, pre=6 */
-#define PM_PWM_LUT_SIZE			64
+/*            */
+#define PM_PWM_LUT_SIZE			80
 #define PM_PWM_LUT_DUTY_TIME_MAX	512	/* ms */
 #define PM_PWM_LUT_PAUSE_MAX		(7000 * PM_PWM_LUT_DUTY_TIME_MAX)
 
@@ -86,13 +87,43 @@ struct pm8xxx_pwm_period {
  * duty_ms - duty cycle time in ms
  * start_idx - index in the LUT
  */
+
+/*                                                         */
+#ifdef CONFIG_LGE_PM8038_KPJT
+struct pm8xxx_pwm_duty_cycles {
+	int *duty_pcts0;
+	int *duty_pcts1;
+	int *duty_pcts2;
+	int *duty_pcts3;
+	int *duty_pcts4;
+	int *duty_pcts5;
+	int *duty_pcts6;
+	int *duty_pcts7;
+	int *duty_pcts8;
+	int *duty_pcts9;
+	int *duty_pcts10;
+	int *duty_pcts11;
+	int *duty_pcts12;
+	int *duty_pcts13;
+	int *duty_pcts14;
+	int *duty_pcts15;
+	int *duty_pcts16;
+	int *duty_pcts17;
+	int *duty_pcts;		/*                                                                      */
+	int num_duty_pcts;
+	int duty_ms;
+	int start_idx;
+	int pause_lo;
+};
+#else
 struct pm8xxx_pwm_duty_cycles {
 	int *duty_pcts;
 	int num_duty_pcts;
 	int duty_ms;
 	int start_idx;
 };
-
+#endif
+/*                                                         */
 /**
  * struct pm8xxx_pwm_platform_data - PWM platform data
  * dtest_channel - Enable LPG DTEST mode for this LPG channel

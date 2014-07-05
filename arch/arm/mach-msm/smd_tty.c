@@ -45,6 +45,11 @@ static uint smd_tty_modem_wait;
 module_param_named(modem_wait, smd_tty_modem_wait,
 			uint, S_IRUGO | S_IWUSR | S_IWGRP);
 
+#ifdef CONFIG_LGE_USES_SMD_DS_TTY
+static uint lge_ds_modem_wait = 20;
+module_param_named(ds_modem_wait, lge_ds_modem_wait,
+			uint, S_IRUGO | S_IWUSR | S_IWGRP);
+#endif
 struct smd_tty_info {
 	smd_channel_t *ch;
 	struct tty_struct *tty;
@@ -58,6 +63,9 @@ struct smd_tty_info {
 	int in_reset;
 	int in_reset_updated;
 	int is_open;
+#ifdef CONFIG_LGE_USES_SMD_DS_TTY
+	int is_dsmodem_ready;
+#endif
 	wait_queue_head_t ch_opened_wait_queue;
 	spinlock_t reset_lock;
 	struct smd_config *smd;
@@ -253,6 +261,28 @@ static void smd_tty_notify(void *priv, unsigned event)
 			schedule_delayed_work(&loopback_work,
 					msecs_to_jiffies(1000));
 		break;
+#ifdef CONFIG_LGE_USES_SMD_DS_TTY
+		/*           
+                                                        
+                                                    
+                                                 
+                                                       
+                                                       
+                                                   
+                                                       
+                                                 
+                                     
+   */
+	case SMD_EVENT_REOPEN_READY:
+		/* smd channel is closed completely */
+		spin_lock_irqsave(&info->reset_lock, flags);
+		info->in_reset = 1;
+		info->in_reset_updated = 1;
+		info->is_open = 0;
+		wake_up_interruptible(&info->ch_opened_wait_queue);
+		spin_unlock_irqrestore(&info->reset_lock, flags);
+		break;
+#endif
 	}
 }
 
@@ -328,6 +358,31 @@ static int smd_tty_open(struct tty_struct *tty, struct file *f)
 
 				res = 0;
 			}
+#ifdef CONFIG_LGE_USES_SMD_DS_TTY
+			/*           
+                                                      
+                                
+    */
+			if (n == DS_IDX) {
+				/* wait for open ready status in seconds */
+				pr_info("%s: checking DS modem status\n", __func__);
+				res = wait_event_interruptible_timeout(
+						info->ch_opened_wait_queue,
+						info->is_dsmodem_ready, (lge_ds_modem_wait * HZ));
+				if (res == 0) {
+					res = -ETIMEDOUT;
+					pr_err("%s: timeout to wait for %s modem: %d\n",
+							__func__, smd_tty[n].smd->port_name, res);
+					goto release_pil;
+				}
+				if (res < 0) {
+					pr_err("%s: timeout to wait for %s modem: %d\n",
+							__func__, smd_tty[n].smd->port_name, res);
+					goto release_pil;
+				}
+				pr_info("%s: DS modem is OK, open smd0..\n", __func__);
+			}
+#endif
 		}
 
 
@@ -377,6 +432,10 @@ static void smd_tty_close(struct tty_struct *tty, struct file *f)
 {
 	struct smd_tty_info *info = tty->driver_data;
 	unsigned long flags;
+#ifdef CONFIG_LGE_USES_SMD_DS_TTY
+	int res = 0;
+	int n = tty->index;
+#endif
 
 	if (info == 0)
 		return;
@@ -395,6 +454,37 @@ static void smd_tty_close(struct tty_struct *tty, struct file *f)
 		del_timer(&info->buf_req_timer);
 		if (info->ch) {
 			smd_close(info->ch);
+#ifdef CONFIG_LGE_USES_SMD_DS_TTY
+			/*           
+                                                         
+                                                     
+                                                  
+                                                        
+                                                        
+                                                    
+                                                        
+                                                  
+                                      
+    */
+			pr_info("%s: waiting to close smd %s completely\n",
+					__func__, smd_tty[n].smd->port_name);
+			/* wait for reopen ready status in seconds */
+			res = wait_event_interruptible_timeout(
+				info->ch_opened_wait_queue,
+				!info->is_open, (lge_ds_modem_wait * HZ));
+			if (res == 0) {
+				/* just in case, remain result value */
+				res = -ETIMEDOUT;
+				pr_err("%s: timeout to wait for %s smd_close.\
+						next smd_open may fail....%d\n",
+						__func__, smd_tty[n].smd->port_name, res);
+			}
+			if (res < 0) {
+				pr_err("%s: wait for %s smd_close failed.\
+						next smd_open may fail....%d\n",
+						__func__, smd_tty[n].smd->port_name, res);
+			}
+#endif
 			info->ch = 0;
 			pil_put(info->pil);
 		}
@@ -533,6 +623,28 @@ static int smd_tty_dummy_probe(struct platform_device *pdev)
 
 	return -ENODEV;
 }
+#ifdef CONFIG_LGE_USES_SMD_DS_TTY
+static int smd_tty_ds_probe(struct platform_device *pdev)
+{
+	if (!smd_configs[DS_IDX].dev_name) {
+		pr_err("%s: no device for DS\n", __func__);
+		return -EINVAL;
+	}
+
+	if (strncmp(pdev->name, smd_configs[DS_IDX].dev_name,
+				SMD_MAX_CH_NAME_LEN)) {
+		pr_err("%s: smd device is not DS %s %s\n", __func__,
+				pdev->name, smd_configs[DS_IDX].dev_name);
+		return -EINVAL;
+	}
+
+	complete_all(&smd_tty[DS_IDX].ch_allocated);
+	smd_tty[DS_IDX].is_dsmodem_ready = 1;
+	wake_up_interruptible(&smd_tty[DS_IDX].ch_opened_wait_queue);
+	pr_info("%s: probing of smd tty for DS modem is done\n", __func__);
+	return 0;
+}
+#endif
 
 static struct tty_driver *smd_tty_driver;
 
@@ -575,6 +687,7 @@ static int __init smd_tty_init(void)
 		if (smd_configs[n].dev_name == NULL)
 			smd_configs[n].dev_name = smd_configs[n].port_name;
 
+#ifndef CONFIG_LGE_USES_SMD_DS_TTY
 		if (idx == DS_IDX) {
 			/*
 			 * DS port uses the kernel API starting with
@@ -595,12 +708,24 @@ static int __init smd_tty_init(void)
 			if (!legacy_ds)
 				continue;
 		}
+#endif
 
 		tty_register_device(smd_tty_driver, idx, 0);
 		init_completion(&smd_tty[idx].ch_allocated);
 
+#ifdef CONFIG_LGE_USES_SMD_DS_TTY
+		if (idx == DS_IDX) {
+			/* register platform device for DS */
+			smd_tty[idx].driver.probe = smd_tty_ds_probe;
+			smd_tty[idx].is_dsmodem_ready = 0;
+		} else {
+			/* register platform device */
+			smd_tty[idx].driver.probe = smd_tty_dummy_probe;
+		}
+#else
 		/* register platform device */
 		smd_tty[idx].driver.probe = smd_tty_dummy_probe;
+#endif
 		smd_tty[idx].driver.driver.name = smd_configs[n].dev_name;
 		smd_tty[idx].driver.driver.owner = THIS_MODULE;
 		spin_lock_init(&smd_tty[idx].reset_lock);

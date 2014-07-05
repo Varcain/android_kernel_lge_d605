@@ -3649,7 +3649,11 @@ no_journal:
 	ext4_orphan_cleanup(sb, es);
 	EXT4_SB(sb)->s_mount_state &= ~EXT4_ORPHAN_FS;
 	if (needs_recovery) {
+#ifdef CONFIG_MACH_LGE_FX3_WCDMA_TRF_US
+
+#else
 		ext4_msg(sb, KERN_INFO, "recovery complete");
+#endif
 		ext4_mark_recovery_complete(sb, es);
 	}
 	if (EXT4_SB(sb)->s_journal) {
@@ -3662,9 +3666,13 @@ no_journal:
 	} else
 		descr = "out journal";
 
+#ifdef CONFIG_MACH_LGE_FX3_WCDMA_TRF_US
+
+#else
 	ext4_msg(sb, KERN_INFO, "mounted filesystem with%s. "
 		 "Opts: %s%s%s", descr, sbi->s_es->s_mount_opts,
 		 *sbi->s_es->s_mount_opts ? "; " : "", orig_data);
+#endif
 
 	if (es->s_error_count)
 		mod_timer(&sbi->s_err_report, jiffies + 300*HZ); /* 5 minutes */
@@ -3673,6 +3681,10 @@ no_journal:
 	return 0;
 
 cantfind_ext4:
+ #ifdef CONFIG_MACH_LGE
+	ret=-ESUPER;
+ #endif 
+
 	if (!silent)
 		ext4_msg(sb, KERN_ERR, "VFS: Can't find ext4 filesystem");
 	goto failed_mount;
@@ -3706,6 +3718,9 @@ failed_mount3:
 	if (sbi->s_mmp_tsk)
 		kthread_stop(sbi->s_mmp_tsk);
 failed_mount2:
+ #ifdef CONFIG_MACH_LGE
+	ret=-ESUPER;
+ #endif 
 	for (i = 0; i < db_count; i++)
 		brelse(sbi->s_group_desc[i]);
 	ext4_kvfree(sbi->s_group_desc);
@@ -4392,7 +4407,11 @@ static int ext4_remount(struct super_block *sb, int *flags, char *data)
 	if (enable_quota)
 		dquot_resume(sb, -1);
 
+#ifdef CONFIG_MACH_LGE_FX3_WCDMA_TRF_US
+
+#else
 	ext4_msg(sb, KERN_INFO, "re-mounted. Opts: %s", orig_data);
+#endif
 	kfree(orig_data);
 	return 0;
 

@@ -44,6 +44,10 @@
 #endif
 #include "mipi_dsi.h"
 
+#ifdef CONFIG_LGE_QC_LCDC_LUT
+#include "lge_qlut.h"
+#endif
+
 uint32 mdp4_extn_disp;
 u32 mdp_iommu_max_map_size;
 static struct clk *mdp_clk;
@@ -543,6 +547,15 @@ error:
 spinlock_t mdp_lut_push_lock;
 static int mdp_lut_i;
 
+#ifdef CONFIG_LGE_QC_LCDC_LUT
+extern int g_qlut_change_by_kernel;
+extern uint32 p_lg_qc_lcdc_lut[];
+#ifdef CONFIG_LGE_KCAL_QLUT
+extern int g_kcal_r;
+extern int g_kcal_g;
+extern int g_kcal_b;
+#endif
+#endif
 static int mdp_lut_hw_update(struct fb_cmap *cmap)
 {
 	int i;
@@ -554,10 +567,36 @@ static int mdp_lut_hw_update(struct fb_cmap *cmap)
 	c[2] = cmap->red;
 
 	for (i = 0; i < cmap->len; i++) {
+#ifdef CONFIG_LGE_QC_LCDC_LUT
+		if (g_qlut_change_by_kernel) {
+			r = ((p_lg_qc_lcdc_lut[i] & R_MASK) >> R_SHIFT);
+			g = ((p_lg_qc_lcdc_lut[i] & G_MASK) >> G_SHIFT);
+			b = ((p_lg_qc_lcdc_lut[i] & B_MASK) >> B_SHIFT);
+#ifdef CONFIG_LGE_KCAL_QLUT
+			r = scaled_by_kcal(r, g_kcal_r);
+			g = scaled_by_kcal(g, g_kcal_g);
+			b = scaled_by_kcal(b, g_kcal_b);
+#endif
+		} else
+#endif
 		if (copy_from_user(&r, cmap->red++, sizeof(r)) ||
 		    copy_from_user(&g, cmap->green++, sizeof(g)) ||
 		    copy_from_user(&b, cmap->blue++, sizeof(b)))
 			return -EFAULT;
+
+//                                                                     
+#ifdef CMAP_RESTORE
+		if (cmap_lut_changed)
+		{
+			r = ~(r & 0xff);
+			g = ~(g & 0xff);
+			b = ~(b & 0xff);
+		}
+#endif
+//                                               
+
+//		printk("%s: mdp kcal r[%d]=%x, g[%d]=%x, b[%d]=%x\n",
+//			__func__, i, r, i, g, i, b);
 
 		last_lut[i] = ((g & 0xff) | ((b & 0xff) << 8) |
 				((r & 0xff) << 16));
@@ -637,7 +676,13 @@ static int mdp_lut_update_lcdc(struct fb_info *info, struct fb_cmap *cmap)
 	}
 
 	/*mask off non LUT select bits*/
+//                                                                     
+#ifdef CONFIG_MACH_LGE
+	out = inpdw(MDP_BASE + 0x90070) & ~((0x1 << 10) | 0x7);
+#else
 	out = inpdw(MDP_BASE + 0x90070);
+#endif
+//                                               
 	MDP_OUTP(MDP_BASE + 0x90070, (mdp_lut_i << 10) | 0x7 | out);
 	mdp_clk_ctrl(0);
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_OFF, FALSE);
@@ -2711,7 +2756,11 @@ static int mdp_irq_clk_setup(struct platform_device *pdev,
 	if (IS_ERR(dsi_pll_vdda)) {
 		dsi_pll_vdda = NULL;
 	} else {
+#ifdef CONFIG_MACH_LGE /*            */
+		if (mdp_rev >= MDP_REV_42 && mdp_rev <= MDP_REV_44) {
+#else
 		if (mdp_rev == MDP_REV_42 || mdp_rev == MDP_REV_44) {
+#endif
 			ret = regulator_set_voltage(dsi_pll_vdda, 1200000,
 				1200000);
 			if (ret) {
@@ -2725,7 +2774,11 @@ static int mdp_irq_clk_setup(struct platform_device *pdev,
 	if (IS_ERR(dsi_pll_vddio)) {
 		dsi_pll_vddio = NULL;
 	} else {
+#ifdef CONFIG_MACH_LGE /*            */
+		if (mdp_rev >= MDP_REV_42) {
+#else
 		if (mdp_rev == MDP_REV_42) {
+#endif
 			ret = regulator_set_voltage(dsi_pll_vddio, 1800000,
 				1800000);
 			if (ret) {
@@ -2792,7 +2845,11 @@ static int mdp_irq_clk_setup(struct platform_device *pdev,
 	MSM_FB_DEBUG("mdp_clk: mdp_clk=%d\n", (int)clk_get_rate(mdp_clk));
 #endif
 
+#ifdef CONFIG_MACH_LGE /*            */
+	if (mdp_rev >= MDP_REV_42 && !cont_splashScreen) {
+#else
 	if (mdp_rev == MDP_REV_42 && !cont_splashScreen) {
+#endif
 		mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 		/* DSI Video Timing generator disable */
 		outpdw(MDP_BASE + 0xE0000, 0x0);
@@ -3059,7 +3116,13 @@ static int mdp_probe(struct platform_device *pdev)
 	case MIPI_VIDEO_PANEL:
 #ifndef CONFIG_FB_MSM_MDP303
 		mipi = &mfd->panel_info.mipi;
+//                                                      
+#ifdef CONFIG_MACH_LGE
+		mdp4_dsi_vsync_init(0);
+#else
 		mfd->vsync_init = mdp4_dsi_vsync_init;
+#endif
+//                                    
 		mfd->vsync_show = mdp4_dsi_video_show_event;
 		mfd->hw_refresh = TRUE;
 		mfd->dma_fnc = mdp4_dsi_video_overlay;
@@ -3105,7 +3168,13 @@ static int mdp_probe(struct platform_device *pdev)
 #ifndef CONFIG_FB_MSM_MDP303
 		mfd->dma_fnc = mdp4_dsi_cmd_overlay;
 		mipi = &mfd->panel_info.mipi;
+//                                                      
+#ifdef CONFIG_MACH_LGE
+		mdp4_dsi_rdptr_init(0);
+#else
 		mfd->vsync_init = mdp4_dsi_rdptr_init;
+#endif
+//                                    
 		mfd->vsync_show = mdp4_dsi_cmd_show_event;
 		if (mfd->panel_info.pdest == DISPLAY_1) {
 			if_no = PRIMARY_INTF_SEL;
@@ -3143,7 +3212,13 @@ static int mdp_probe(struct platform_device *pdev)
 
 #ifdef CONFIG_FB_MSM_DTV
 	case DTV_PANEL:
+//                                                      
+#ifdef CONFIG_MACH_LGE
+		mdp4_dtv_vsync_init(0);
+#else
 		mfd->vsync_init = mdp4_dtv_vsync_init;
+#endif
+//                                    
 		mfd->vsync_show = mdp4_dtv_show_event;
 		pdata->on = mdp4_dtv_on;
 		pdata->off = mdp4_dtv_off;
@@ -3183,7 +3258,13 @@ static int mdp_probe(struct platform_device *pdev)
 #endif
 
 #ifdef CONFIG_FB_MSM_MDP40
+//                                                      
+#ifdef CONFIG_MACH_LGE
+		mdp4_lcdc_vsync_init(0);
+#else
 		mfd->vsync_init = mdp4_lcdc_vsync_init;
+#endif
+//                                    
 		mfd->vsync_show = mdp4_lcdc_show_event;
 		if (mfd->panel.type == HDMI_PANEL) {
 			mfd->dma = &dma_e_data;
@@ -3289,9 +3370,13 @@ static int mdp_probe(struct platform_device *pdev)
 	pdev_list[pdev_list_cnt++] = pdev;
 	mdp4_extn_disp = 0;
 
+/*                                  
+                                                                 
+ */
+#ifndef CONFIG_MACH_LGE
 	if (mfd->vsync_init != NULL) {
 		mfd->vsync_init(0);
-
+#endif
 		if (!mfd->vsync_sysfs_created) {
 			mfd->dev_attr.attr.name = "vsync_event";
 			mfd->dev_attr.attr.mode = S_IRUGO;
@@ -3310,7 +3395,9 @@ static int mdp_probe(struct platform_device *pdev)
 			pr_debug("%s: kobject_uevent(KOBJ_ADD)\n", __func__);
 			mfd->vsync_sysfs_created = 1;
 		}
+#ifndef CONFIG_MACH_LGE
 	}
+#endif
 	return 0;
 
       mdp_probe_err:

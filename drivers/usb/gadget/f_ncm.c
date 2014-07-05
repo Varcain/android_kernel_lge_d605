@@ -166,8 +166,8 @@ static struct usb_cdc_union_desc ncm_union_desc __initdata = {
 	/* .bSlaveInterface0 =	DYNAMIC */
 };
 
-static struct usb_cdc_ether_desc ecm_desc __initdata = {
-	.bLength =		sizeof ecm_desc,
+static struct usb_cdc_ether_desc necm_desc __initdata = {
+	.bLength =		sizeof necm_desc,
 	.bDescriptorType =	USB_DT_CS_INTERFACE,
 	.bDescriptorSubType =	USB_CDC_ETHERNET_TYPE,
 
@@ -255,7 +255,7 @@ static struct usb_descriptor_header *ncm_fs_function[] __initdata = {
 	(struct usb_descriptor_header *) &ncm_control_intf,
 	(struct usb_descriptor_header *) &ncm_header_desc,
 	(struct usb_descriptor_header *) &ncm_union_desc,
-	(struct usb_descriptor_header *) &ecm_desc,
+	(struct usb_descriptor_header *) &necm_desc,
 	(struct usb_descriptor_header *) &ncm_desc,
 	(struct usb_descriptor_header *) &fs_ncm_notify_desc,
 	/* data interface, altsettings 0 and 1 */
@@ -301,7 +301,7 @@ static struct usb_descriptor_header *ncm_hs_function[] __initdata = {
 	(struct usb_descriptor_header *) &ncm_control_intf,
 	(struct usb_descriptor_header *) &ncm_header_desc,
 	(struct usb_descriptor_header *) &ncm_union_desc,
-	(struct usb_descriptor_header *) &ecm_desc,
+	(struct usb_descriptor_header *) &necm_desc,
 	(struct usb_descriptor_header *) &ncm_desc,
 	(struct usb_descriptor_header *) &hs_ncm_notify_desc,
 	/* data interface, altsettings 0 and 1 */
@@ -316,13 +316,13 @@ static struct usb_descriptor_header *ncm_hs_function[] __initdata = {
 
 #define STRING_CTRL_IDX	0
 #define STRING_MAC_IDX	1
-#define STRING_DATA_IDX	2
+#define NCM_STRING_DATA_IDX	2
 #define STRING_IAD_IDX	3
 
 static struct usb_string ncm_string_defs[] = {
 	[STRING_CTRL_IDX].s = "CDC Network Control Model (NCM)",
 	[STRING_MAC_IDX].s = NULL /* DYNAMIC */,
-	[STRING_DATA_IDX].s = "CDC Network Data",
+	[NCM_STRING_DATA_IDX].s = "CDC Network Data",
 	[STRING_IAD_IDX].s = "CDC NCM",
 	{  } /* end of list */
 };
@@ -636,6 +636,10 @@ static int ncm_setup(struct usb_function *f, const struct usb_ctrlrequest *ctrl)
 		value = w_length > sizeof ntb_parameters ?
 			sizeof ntb_parameters : w_length;
 		memcpy(req->buf, &ntb_parameters, value);
+#ifdef CONFIG_USB_LGE_ANDROID_NCM
+		((struct usb_cdc_ncm_ntb_parameters *)(req->buf))->dwNtbOutMaxSize =
+			cpu_to_le32(NTB_OUT_SIZE-1);
+#endif
 		VDBG(cdev, "Host asked NTB parameters\n");
 		break;
 
@@ -824,6 +828,12 @@ static int ncm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 				}
 			}
 
+#ifdef CONFIG_USB_LGE_ANDROID_NCM
+			ncm->port.is_zlp_ok = !(
+				gadget_is_musbhdrc(cdev->gadget) ||
+				gadget_is_ci13xxx_msm(cdev->gadget)
+				);
+#else
 			/* TODO */
 			/* Enable zlps by default for NCM conformance;
 			 * override for musb_hdrc (avoids txdma ovhead)
@@ -831,6 +841,7 @@ static int ncm_set_alt(struct usb_function *f, unsigned intf, unsigned alt)
 			ncm->port.is_zlp_ok = !(
 				gadget_is_musbhdrc(cdev->gadget)
 				);
+#endif
 			ncm->port.cdc_filter = DEFAULT_FILTER;
 			DBG(cdev, "activate ncm\n");
 			net = gether_connect(&ncm->port);
@@ -1321,7 +1332,7 @@ int __init ncm_bind_config(struct usb_configuration *c, u8 ethaddr[ETH_ALEN])
 		status = usb_string_id(c->cdev);
 		if (status < 0)
 			return status;
-		ncm_string_defs[STRING_DATA_IDX].id = status;
+		ncm_string_defs[NCM_STRING_DATA_IDX].id = status;
 		ncm_data_nop_intf.iInterface = status;
 		ncm_data_intf.iInterface = status;
 
@@ -1330,7 +1341,7 @@ int __init ncm_bind_config(struct usb_configuration *c, u8 ethaddr[ETH_ALEN])
 		if (status < 0)
 			return status;
 		ncm_string_defs[STRING_MAC_IDX].id = status;
-		ecm_desc.iMACAddress = status;
+		necm_desc.iMACAddress = status;
 
 		/* IAD */
 		status = usb_string_id(c->cdev);
@@ -1376,3 +1387,88 @@ int __init ncm_bind_config(struct usb_configuration *c, u8 ethaddr[ETH_ALEN])
 	}
 	return status;
 }
+
+#ifdef CONFIG_USB_LGE_ANDROID_NCM
+static struct delayed_work start_work;
+
+static const struct file_operations ncm_fops = {
+	.owner = THIS_MODULE,
+};
+
+static struct miscdevice ncm_device = {
+	.minor = MISC_DYNAMIC_MINOR,
+	.name = "usb_ncm",
+	.fops = &ncm_fops,
+};
+
+static int ncm_ctrlrequest(struct usb_composite_dev *cdev,
+		const struct usb_ctrlrequest *ctrl)
+{
+	int value = -EOPNOTSUPP;
+	u8 b_requestType = ctrl->bRequestType;
+	u8 b_request = ctrl->bRequest;
+	u16 w_index = le16_to_cpu(ctrl->wIndex);
+	u16 w_value = le16_to_cpu(ctrl->wValue);
+	u16 w_length = le16_to_cpu(ctrl->wLength);
+
+	if (b_requestType == (USB_DIR_OUT | USB_TYPE_VENDOR)) {
+		if (ctrl->bRequest == 0xf0) {
+			/*
+			mode_version = w_value;
+			mode_vendor_id = w_index;
+			*/
+			printk(KERN_INFO "ncm_ctrlrequest "
+					"%02x.%02x v%04x i%04x l%u\n",
+					b_requestType, b_request,
+					w_value, w_index, w_length);
+			value = 0;
+			schedule_delayed_work(&start_work, msecs_to_jiffies(10));
+		}
+	}
+
+	if (value >= 0) {
+		cdev->req->zero = 0;
+		cdev->req->length = value;
+		value = usb_ep_queue(cdev->gadget->ep0, cdev->req, GFP_ATOMIC);
+		if (value < 0)
+			ERROR(cdev, "%s setup response queue error\n",
+					__func__);
+	}
+
+	if (value == -EOPNOTSUPP)
+		VDBG(cdev,
+			"unknown class-specific control req "
+			"%02x.%02x v%04x i%04x l%u\n",
+			ctrl->bRequestType, ctrl->bRequest,
+			w_value, w_index, w_length);
+	return value;
+}
+
+static void ncm_start_work(struct work_struct *data)
+{
+	char *envp[2] = { "NCM=START", NULL };
+	kobject_uevent_env(&ncm_device.this_device->kobj, KOBJ_CHANGE, envp);
+}
+
+static int ncm_init(void)
+{
+	int ret;
+
+	INIT_DELAYED_WORK(&start_work, ncm_start_work);
+
+	ret = misc_register(&ncm_device);
+	if (ret)
+		goto err;
+
+	return 0;
+
+err:
+	pr_err("USB ncm gadget driver failed to initialize\n");
+	return ret;
+}
+
+static void ncm_cleanup(void)
+{
+	misc_deregister(&ncm_device);
+}
+#endif

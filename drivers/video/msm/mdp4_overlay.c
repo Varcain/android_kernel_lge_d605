@@ -134,7 +134,9 @@ void  mdp4_overlay_free_base_pipe(struct msm_fb_data_type *mfd)
 		else if (ctrl->panel_mode & MDP4_PANEL_LCDC)
 			mdp4_lcdc_free_base_pipe(mfd);
 	} else if (hdmi_prim_display || mfd->index == 1) {
+#ifdef CONFIG_FB_MSM_DTV
 		mdp4_dtv_free_base_pipe(mfd);
+#endif
 	}
 }
 
@@ -425,6 +427,12 @@ void mdp4_iommu_unmap(struct mdp4_overlay_pipe *pipe)
 		iom_pipe_info->mark_unmap = 0;
 	}
 }
+
+/*                                                                */
+#if defined(CONFIG_MACH_LGE_FX3_VZW) || defined(CONFIG_MACH_LGE_FX3Q_TMUS) 
+static int panel_rotate_180 = 1;
+#endif
+/*                                                              */
 
 int mdp4_overlay_mixer_play(int mixer_num)
 {
@@ -845,6 +853,27 @@ void mdp4_overlay_rgb_setup(struct mdp4_overlay_pipe *pipe)
 	mask = 0xFFFEFFFF;
 	pipe->op_mode = (pipe->op_mode & mask) | (curr & ~mask);
 
+	/*                                                                */
+#if defined(CONFIG_MACH_LGE_FX3_VZW) || defined(CONFIG_MACH_LGE_FX3Q_TMUS) 
+	if (panel_rotate_180 && (pipe->pipe_num == OVERLAY_PIPE_RGB1 || pipe->pipe_num == OVERLAY_PIPE_RGB2))
+	{
+		uint32 op_mode = pipe->op_mode | MDP4_OP_FLIP_UD | MDP4_OP_SCALEY_EN;
+
+		if (pipe->ext_flag & MDP_FLIP_UD)
+			op_mode &= ~MDP4_OP_FLIP_UD;
+
+		pipe->op_mode = op_mode;
+
+		/*                                                                                                             */
+  	    if (pipe->mfd)		
+			dst_xy = (((pipe->mfd->panel_info.yres - pipe->dst_y - pipe->dst_h) << 16) | pipe->dst_x);
+		else
+			pr_err("rgb mfd is not set\n");
+		/*                                           */
+	}
+#endif
+	/*                                                              */
+
 	outpdw(rgb_base + 0x0000, src_size);	/* MDP_RGB_SRC_SIZE */
 	outpdw(rgb_base + 0x0004, src_xy);	/* MDP_RGB_SRC_XY */
 	outpdw(rgb_base + 0x0008, dst_size);	/* MDP_RGB_DST_SIZE */
@@ -1040,6 +1069,26 @@ void mdp4_overlay_vg_setup(struct mdp4_overlay_pipe *pipe)
 		}
 	}
 
+	/*                                                                */
+#if defined(CONFIG_MACH_LGE_FX3_VZW) || defined(CONFIG_MACH_LGE_FX3Q_TMUS) 
+	if (panel_rotate_180)
+	{
+		uint32 op_mode = pipe->op_mode | MDP4_OP_FLIP_UD;
+
+		if (pipe->ext_flag & MDP_FLIP_UD)
+			op_mode &= ~MDP4_OP_FLIP_UD;
+
+		pipe->op_mode = op_mode;
+		/*                                                                                                             */
+	    if (pipe->mfd) 	
+		    dst_xy = (((pipe->mfd->panel_info.yres - pipe->dst_y - pipe->dst_h) << 16) | pipe->dst_x);
+    	else
+	    	pr_err("vg mfd is not set\n");
+		/*                                 */
+	}
+#endif
+	/*                                                              */
+
 	mdp_pipe_ctrl(MDP_CMD_BLOCK, MDP_BLOCK_POWER_ON, FALSE);
 
 	outpdw(vg_base + 0x0000, src_size);	/* MDP_RGB_SRC_SIZE */
@@ -1047,13 +1096,8 @@ void mdp4_overlay_vg_setup(struct mdp4_overlay_pipe *pipe)
 	outpdw(vg_base + 0x0008, dst_size);	/* MDP_RGB_DST_SIZE */
 	outpdw(vg_base + 0x000c, dst_xy);	/* MDP_RGB_DST_XY */
 
-	/* TILE frame size */
-	if (pipe->frame_format != MDP4_FRAME_FORMAT_LINEAR) {
-		if (ctrl->panel_mode & MDP4_PANEL_DSI_CMD)
-			outpdw(vg_base + 0x0048, frame_size);
-		else
-			pipe->frame_size = frame_size;
-	}
+	if (pipe->frame_format != MDP4_FRAME_FORMAT_LINEAR)
+		outpdw(vg_base + 0x0048, frame_size);	/* TILE frame size */
 
 	/*
 	 * Adjust src X offset to avoid MDP from overfetching pixels
@@ -2682,6 +2726,12 @@ static int mdp4_overlay_req2pipe(struct mdp_overlay *req, int mixer,
 		return -ENOMEM;
 	}
 
+	/*                                                                */
+#if defined(CONFIG_MACH_LGE_FX3_VZW) || defined(CONFIG_MACH_LGE_FX3Q_TMUS) 
+		pipe->mfd = mfd;
+#endif
+	/*                                                              */
+
 	if (!display_iclient && !IS_ERR_OR_NULL(mfd->iclient)) {
 		display_iclient = mfd->iclient;
 		pr_debug("%s(): display_iclient %p\n", __func__,
@@ -2728,6 +2778,14 @@ static int mdp4_overlay_req2pipe(struct mdp_overlay *req, int mixer,
 	pipe->dst_x = req->dst_rect.x & 0x07ff;
 
 	pipe->op_mode = 0;
+
+	/*                                                                */
+#if defined(CONFIG_MACH_LGE_FX3_VZW) || defined(CONFIG_MACH_LGE_FX3Q_TMUS) 
+#if 1
+	pipe->ext_flag = req->flags;
+#endif
+#endif
+	/*                                                              */
 
 	if (req->flags & MDP_FLIP_LR)
 		pipe->op_mode |= MDP4_OP_FLIP_LR;
@@ -2887,9 +2945,20 @@ static int mdp4_calc_req_mdp_clk(struct msm_fb_data_type *mfd,
 	 * factor. Ideally this factor is passed from board file.
 	 */
 	if (rst < pclk) {
+	/*
+                                                 
+                                                                       
+  */
+#if defined(CONFIG_MACH_LGE_L9II_COMMON)
+		pr_debug("%s calculated mdp clk is less than pclk. rst:%llu, pclk:%u\n",
+				__func__, rst, pclk);
+		rst = ((pclk >> shift) * 69 / 50) << shift;
+		pr_debug("%s fix rst -> rst:%llu\n", __func__, rst);
+#else
 		rst = ((pclk >> shift) * 23 / 20) << shift;
 		pr_debug("%s calculated mdp clk is less than pclk.\n",
 			__func__);
+#endif
 	}
 	pr_debug("%s: required mdp clk %d\n", __func__, (u32)rst);
 
@@ -3776,24 +3845,6 @@ void mdp4_overlay_dma_commit(int mixer)
 	* non double buffer register update here
 	* perf level, new clock rate should be done here
 	*/
-	struct mdp4_overlay_pipe *pipe;
-	char *vg_base;
-	int i, pnum;
-	for (i = 0; i < OVERLAY_PIPE_MAX; i++, pipe++) {
-		pipe = ctrl->stage[mixer][i];
-		if (pipe) {
-			if (pipe->pipe_type == OVERLAY_TYPE_VIDEO &&
-						(pipe->frame_format !=
-						MDP4_FRAME_FORMAT_LINEAR) &&
-						pipe->frame_size) {
-				pnum = pipe->pipe_num - OVERLAY_PIPE_VG1;
-				vg_base = MDP_BASE + MDP4_VIDEO_BASE;
-				vg_base += (MDP4_VIDEO_OFF * pnum);
-				outpdw(vg_base + 0x0048, pipe->frame_size);
-				pipe->frame_size = 0;
-			}
-		}
-	}
 }
 
 /*
@@ -3953,6 +4004,12 @@ int mdp4_overlay_play(struct fb_info *info, struct msmfb_overlay_data *req)
 	}
 
 	mdp4_overlay_mdp_perf_req(mfd);
+
+	/*                                                                */
+#if defined(CONFIG_MACH_LGE_FX3_VZW) || defined(CONFIG_MACH_LGE_FX3Q_TMUS) 
+	pipe->mfd = mfd;
+#endif
+	/*                                                              */
 
 	if (pipe->mixer_num == MDP4_MIXER0) {
 		if (ctrl->panel_mode & MDP4_PANEL_DSI_CMD) {

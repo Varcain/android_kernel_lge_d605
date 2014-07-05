@@ -333,10 +333,18 @@ struct rb_node *rb_augment_erase_begin(struct rb_node *node)
 		deepest = node->rb_right;
 	else {
 		deepest = rb_next(node);
-		if (deepest->rb_right)
-			deepest = deepest->rb_right;
-		else if (rb_parent(deepest) != node)
-			deepest = rb_parent(deepest);
+		/*                                     */
+		/* Null Pointer Dereference found */
+		if (deepest != NULL) {
+			if (deepest->rb_right)
+				deepest = deepest->rb_right;
+			else if (rb_parent(deepest) != node)
+				deepest = rb_parent(deepest);
+		}
+		else {
+			WARN(1, "%s:deepst got null pointer\n", __func__); 
+		}
+		/*              */
 	}
 
 	return deepest;

@@ -772,6 +772,10 @@ SYSCALL_DEFINE2(delete_module, const char __user *, name_user,
 	char name[MODULE_NAME_LEN];
 	int ret, forced = 0;
 
+#ifdef CONFIG_MACH_LGE_FX3_SPCSTRF
+        pr_debug("load_module: This function is not supported \n");
+        return -EPERM;
+#endif
 	if (!capable(CAP_SYS_MODULE) || modules_disabled)
 		return -EPERM;
 
@@ -3012,6 +3016,10 @@ SYSCALL_DEFINE3(init_module, void __user *, umod,
 	struct module *mod;
 	int ret = 0;
 
+#ifdef CONFIG_MACH_LGE_FX3_SPCSTRF
+	pr_debug("load_module: This function is not supported \n");
+	return -EPERM;
+#endif
 	/* Must have permission */
 	if (!capable(CAP_SYS_MODULE) || modules_disabled)
 		return -EPERM;

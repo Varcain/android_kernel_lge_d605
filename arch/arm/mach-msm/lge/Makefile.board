@@ -2,5 +2,6 @@
 # Makefile for the LGE board
 #
 
-# MAKO
-obj-$(CONFIG_MACH_APQ8064_MAKO) += mako/
+# fx3
+obj-$(CONFIG_MACH_MSM8930_FX3) += fx3/
+

@@ -888,6 +888,11 @@ static int snd_ctl_elem_write(struct snd_card *card, struct snd_ctl_file *file,
 			result = -EPERM;
 		} else {
 			snd_ctl_build_ioff(&control->id, kctl, index_offset);
+//                                   
+#if 1
+			printk(KERN_ERR "**** %s():name = %s = %ld \n",
+					__func__, control->id.name,control->value.integer.value[0]);
+#endif 
 			result = kctl->put(kctl, control);
 		}
 		if (result > 0) {

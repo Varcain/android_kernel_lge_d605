@@ -553,6 +553,10 @@ int res_trk_update_bus_perf_level(struct vcd_dev_ctxt *dev_ctxt, u32 perf_level)
 	int rc = 0;
 	bool turbo_supported =
 		!resource_context.vidc_platform_data->disable_turbo;
+	/*                                                                                                         */
+	int higer_bus_bw =
+	   resource_context.vidc_platform_data->vote_high_bw;
+	/*                                                                                                         */
 
 	cctxt_itr = dev_ctxt->cctxt_list_head;
 	while (cctxt_itr) {
@@ -578,6 +582,13 @@ int res_trk_update_bus_perf_level(struct vcd_dev_ctxt *dev_ctxt, u32 perf_level)
 		bus_clk_index = 2;
 	else if (!turbo_supported && bus_clk_index == 3)
 		bus_clk_index = 2;
+	/*                                                                                                         */
+	if (!client_type && (bus_clk_index == 2) &&
+		higer_bus_bw && turbo_supported) {
+		VCDRES_MSG_HIGH("%s(): request more bus BW", __func__);
+		bus_clk_index = 3;
+	}
+	/*                                                                                                         */
 	bus_clk_index = (bus_clk_index << 1) + (client_type + 1);
 	VCDRES_MSG_LOW("%s(), bus_clk_index = %d", __func__, bus_clk_index);
 	VCDRES_MSG_LOW("%s(),context.pcl = %x", __func__, resource_context.pcl);

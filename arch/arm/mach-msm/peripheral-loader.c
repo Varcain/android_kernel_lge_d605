@@ -389,6 +389,13 @@ void *pil_get(const char *name)
 	}
 	pil->count++;
 	pil_set_state(pil, PIL_ONLINE);
+/*            */
+#ifdef CONFIG_MACH_LGE
+	//                                                   
+	//ALRAN
+	//pr_err("ALRAN: %s, count %d, pid %d, %s\n", __func__, pil->count, current->pid, current->comm);
+#endif
+
 	mutex_unlock(&pil->lock);
 out:
 	return retval;
@@ -431,8 +438,23 @@ void pil_put(void *peripheral_handle)
 	if (WARN(!pil->count, "%s: %s: Reference count mismatch\n",
 			pil->desc->name, __func__))
 		goto err_out;
+
+/*            */
+#if CONFIG_MACH_LGE
+	//                                                                       
+	if (!--pil->count){
+		if (!!strncmp("modem", pil->desc->name, 5)) //ALRAN : LG FX3 - allow pil_put only for not modem*
+			pil_shutdown(pil);
+		else{
+			pr_err("ALRAN: pil %s shutdown, but block it\n", pil->desc->name);
+			pil->count++;
+		}
+	}
+#else
 	if (!--pil->count)
 		pil_shutdown(pil);
+#endif
+
 	mutex_unlock(&pil->lock);
 
 	pil_d = find_peripheral(pil->desc->depends_on);

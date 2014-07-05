@@ -111,6 +111,12 @@ static bool rt_mt6(const struct sk_buff *skb, struct xt_action_param *par)
 						       reserved),
 					sizeof(_reserved),
 					&_reserved);
+		/*                                      */
+		if (rp == NULL) {
+			/* failed due to return NULL pointer */
+			return false;
+		}
+		/*              */
 
 		ret = (*rp == 0);
 	}

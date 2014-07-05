@@ -272,6 +272,9 @@ config ARCH_RANDOM
 
 	 If unsure, say N
 
+# LGE_CHANGE: for SRD  2012.10
+source "lge/Kconfig"
+
 config GENERIC_TIME_VSYSCALL
 	bool "Enable gettimeofday updates"
 	depends on CPU_V7

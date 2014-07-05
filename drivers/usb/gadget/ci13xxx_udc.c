@@ -2757,6 +2757,7 @@ __acquires(udc->lock)
 					udc->remote_wakeup = 1;
 					err = isr_setup_status_phase(udc);
 					break;
+#ifdef CONFIG_USB_OTG
 				case USB_DEVICE_B_HNP_ENABLE:
 					udc->gadget.b_hnp_enable = 1;
 					err = isr_setup_status_phase(udc);
@@ -2767,6 +2768,13 @@ __acquires(udc->lock)
 					break;
 				case USB_DEVICE_A_ALT_HNP_SUPPORT:
 					break;
+#else
+				case USB_DEVICE_B_HNP_ENABLE:
+				case USB_DEVICE_A_HNP_SUPPORT:
+				case USB_DEVICE_A_ALT_HNP_SUPPORT:
+					err = 0;
+					break;
+#endif
 				case USB_DEVICE_TEST_MODE:
 					tmode = le16_to_cpu(req.wIndex) >> 8;
 					switch (tmode) {
@@ -2779,6 +2787,7 @@ __acquires(udc->lock)
 						err = isr_setup_status_phase(
 								udc);
 						break;
+#ifdef CONFIG_USB_OTG
 					case TEST_OTG_SRP_REQD:
 						udc->gadget.otg_srp_reqd = 1;
 						err = isr_setup_status_phase(
@@ -2789,6 +2798,12 @@ __acquires(udc->lock)
 						err = isr_setup_status_phase(
 								udc);
 						break;
+#else
+					case TEST_OTG_SRP_REQD:
+					case TEST_OTG_HNP_REQD:
+						err = 0;
+						break;
+#endif
 					default:
 						break;
 					}

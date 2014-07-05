@@ -1299,6 +1299,9 @@ enum v4l2_colorfx {
 #define V4L2_CID_SPECIAL_EFFECT			(V4L2_CID_BASE+43)
 /* Minimum number of buffer neede by the device */
 
+#define V4L2_CID_NIGHT_MODE			(V4L2_CID_BASE+44)  /*                                                                  */
+#define V4L2_CID_FPS_RANGE			(V4L2_CID_BASE+45)  /*                                                                 */
+
 /*  MPEG-class control IDs defined by V4L2 */
 #define V4L2_CID_MPEG_BASE 			(V4L2_CTRL_CLASS_MPEG | 0x900)
 #define V4L2_CID_MPEG_CLASS 			(V4L2_CTRL_CLASS_MPEG | 1)
@@ -2088,6 +2091,7 @@ struct v4l2_enc_idx {
 #define V4L2_ENC_CMD_STOP       (1)
 #define V4L2_ENC_CMD_PAUSE      (2)
 #define V4L2_ENC_CMD_RESUME     (3)
+#define V4L2_ENC_QCOM_CMD_FLUSH  (4)
 
 /* Flags for V4L2_ENC_CMD_STOP */
 #define V4L2_ENC_CMD_STOP_AT_GOP_END    (1 << 0)
@@ -2124,6 +2128,9 @@ struct v4l2_encoder_cmd {
 /* Flags for V4L2_DEC_QCOM_CMD_FLUSH */
 #define V4L2_DEC_QCOM_CMD_FLUSH_OUTPUT  (1 << 0)
 #define V4L2_DEC_QCOM_CMD_FLUSH_CAPTURE (1 << 1)
+
+#define V4L2_QCOM_CMD_FLUSH_OUTPUT  (1 << 0)
+#define V4L2_QCOM_CMD_FLUSH_CAPTURE (1 << 1)
 
 /* Play format requirements (returned by the driver): */
 

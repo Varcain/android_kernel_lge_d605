@@ -13,6 +13,42 @@
 #include <linux/module.h>
 #include "msm_actuator.h"
 
+
+/*                                                                          */
+#ifdef CONFIG_S5K4E5YA_EEPROM
+extern uint8_t s5k4e5ya_afcalib_data[4];
+#define SUPPORT_AF_CALIBRATION
+#define ACTUATOR_MARGIN 30
+/*                                                                                   */
+#define MANUAL_ACT_MARGIN   30
+/*                                                                                   */
+#define ACTUATOR_MIN_MOVE_RANGE 0
+#define ACTUATOR_MAX_MOVE_RANGE 1023
+#define ACTUATOR_MIN_FOCUS_RANGE 150
+#define ACTUATOR_MIN_INFINIT_RANGE 100	/*                                                                                                                        */
+#define ACTUATOR_MAX_INFINIT_RANGE 300	/*                                                                                                                        */
+#define ACTUATOR_MIN_MACRO_RANGE 370	/*                                                                                                                        */
+#define ACTUATOR_MAX_MACRO_RANGE 700	/*                                                                                                                        */
+#endif
+/*                                                                          */
+
+/*                                                                          */
+#if defined(CONFIG_IMX111)
+#define ACTUATOR_MARGIN				50
+/*                                                                                   */
+#define MANUAL_ACT_MARGIN   0
+/*                                                                                   */
+#define ACTUATOR_MIN_FOCUS_RANGE	200
+#define SUPPORT_AF_CALIBRATION
+#define ACTUATOR_MIN_MOVE_RANGE 0
+#define ACTUATOR_MAX_MOVE_RANGE 1023
+#define ACTUATOR_MIN_INFINIT_RANGE 100	/*                                                                                                                        */
+#define ACTUATOR_MAX_INFINIT_RANGE 300	/*                                                                                                                        */
+#define ACTUATOR_MIN_MACRO_RANGE 370	/*                                                                                                                        */
+#define ACTUATOR_MAX_MACRO_RANGE 700	/*                                                                                                                        */
+#endif
+/*                                                                          */
+
 static struct msm_actuator_ctrl_t msm_actuator_t;
 static struct msm_actuator msm_vcm_actuator_table;
 static struct msm_actuator msm_piezo_actuator_table;
@@ -60,11 +96,24 @@ static int32_t msm_actuator_parse_i2c_params(struct msm_actuator_ctrl_t *a_ctrl,
 	struct msm_camera_i2c_reg_tbl *i2c_tbl = a_ctrl->i2c_reg_tbl;
 	CDBG("%s: IN\n", __func__);
 	for (i = 0; i < size; i++) {
+#if 1
+/*           
+                                  
+                                                                                           
+                               
+ */
+		if(a_ctrl->i2c_tbl_index > ((a_ctrl->total_steps*2)+1)) {
+			printk("[ERR] %s, i2c_tbl_index is too big, i2c_tbl_index %d, total_steps %d \n", __func__,a_ctrl->i2c_tbl_index, a_ctrl->total_steps);
+			break;
+		}
+		/*                                                                                                                                           */
+#else //QMC original
 		/* check that the index into i2c_tbl cannot grow larger that
 		the allocated size of i2c_tbl */
 		if ((a_ctrl->total_steps + 1) < (a_ctrl->i2c_tbl_index)) {
 			break;
 		}
+#endif
 		if (write_arr[i].reg_write_type == MSM_ACTUATOR_WRITE_DAC) {
 			value = (next_lens_position <<
 				write_arr[i].data_shift) |
@@ -288,14 +337,31 @@ static int32_t msm_actuator_move_focus(
 		if ((dest_step_pos * sign_dir) <=
 			(step_boundary * sign_dir)) {
 
+/*                                                                                               */
+			struct damping_params_t damping_param, *usr_damping_param ; // namkyu2.kang
+/*                                                                                               */
 			target_step_pos = dest_step_pos;
 			target_lens_pos =
 				a_ctrl->step_position_table[target_step_pos];
+/*                                                                                               */
+			usr_damping_param = &(move_params->ringing_params[a_ctrl->curr_region_index]) ;
+			if (copy_from_user(&damping_param,
+					(void *)usr_damping_param,
+					sizeof(struct damping_params_t)))
+			{
+				pr_err("%s: ringing_param is on FAULT Address : %p\n",
+						__func__, (void *)usr_damping_param ) ;
+				return -EFAULT;
+			}
+/*                                                                                               */
 			rc = a_ctrl->func_tbl->
 				actuator_write_focus(
 					a_ctrl,
 					curr_lens_pos,
-					&ringing_params_kernel,
+/*                                                                                               */
+					//&ringing_params_kernel,
+					&damping_param, // namkyu2.kang
+/*                                                                                               */
 					sign_dir,
 					target_lens_pos);
 			if (rc < 0) {
@@ -306,14 +372,31 @@ static int32_t msm_actuator_move_focus(
 			curr_lens_pos = target_lens_pos;
 
 		} else {
+/*                                                                                               */
+			struct damping_params_t damping_param, *usr_damping_param ; // namkyu2.kang
+/*                                                                                               */
 			target_step_pos = step_boundary;
 			target_lens_pos =
 				a_ctrl->step_position_table[target_step_pos];
+/*                                                                                               */
+			usr_damping_param = &(move_params->ringing_params[a_ctrl->curr_region_index]) ;
+			if (copy_from_user(&damping_param,
+					(void *)usr_damping_param,
+					sizeof(struct damping_params_t)))
+			{
+				pr_err("%s: ringing_param is on FAULT Address : %p\n",
+						__func__, (void *)usr_damping_param ) ;
+				return -EFAULT;
+			}
+/*                                                                                               */
 			rc = a_ctrl->func_tbl->
 				actuator_write_focus(
 					a_ctrl,
 					curr_lens_pos,
-					&ringing_params_kernel,
+/*                                                                                               */
+//					&ringing_params_kernel,
+					&damping_param, // namkyu2.kang
+/*                                                                                               */
 					sign_dir,
 					target_lens_pos);
 			if (rc < 0) {
@@ -340,6 +423,132 @@ static int32_t msm_actuator_move_focus(
 
 	return rc;
 }
+/*                                                                                   */
+static int32_t msm_actuator_move_focus_manual(
+	struct msm_actuator_ctrl_t *a_ctrl,
+	struct msm_actuator_move_params_t *move_params)
+{
+	int32_t rc = 0;
+	int8_t sign_dir = move_params->sign_dir;
+	uint16_t step_boundary = 0;
+	uint16_t target_step_pos = 0;
+	uint16_t target_lens_pos = 0;
+	int16_t dest_step_pos = move_params->dest_step_pos;
+	uint16_t curr_lens_pos = 0;
+	int dir = move_params->dir;
+	int32_t num_steps = move_params->num_steps;
+
+	CDBG("%s called, dir %d, num_steps %d\n",
+		__func__,
+		dir,
+		num_steps);
+
+	if (dest_step_pos == a_ctrl->curr_step_pos)
+		return rc;
+
+	curr_lens_pos = a_ctrl->step_position_table_manual[a_ctrl->curr_step_pos];
+	a_ctrl->i2c_tbl_index = 0;
+	printk("curr_step_pos =%d dest_step_pos =%d curr_lens_pos=%d\n",
+		a_ctrl->curr_step_pos, dest_step_pos, curr_lens_pos);
+
+	while (a_ctrl->curr_step_pos != dest_step_pos) {
+		step_boundary =
+			a_ctrl->region_params[a_ctrl->curr_region_index].
+			step_bound[dir];
+		if ((dest_step_pos * sign_dir) <=
+			(step_boundary * sign_dir)) {
+
+/*                                                                                               */
+			struct damping_params_t damping_param, *usr_damping_param ; // namkyu2.kang
+/*                                                                                               */
+			target_step_pos = dest_step_pos;
+			target_lens_pos =
+				a_ctrl->step_position_table_manual[target_step_pos];
+/*                                                                                               */
+			usr_damping_param = &(move_params->ringing_params[a_ctrl->curr_region_index]) ;
+			if (copy_from_user(&damping_param,
+					(void *)usr_damping_param,
+					sizeof(struct damping_params_t)))
+			{
+				pr_err("%s: ringing_param is on FAULT Address : %p\n",
+						__func__, (void *)usr_damping_param ) ;
+				return -EFAULT;
+			}
+/*                                                                                               */
+			rc = a_ctrl->func_tbl->
+				actuator_write_focus(
+					a_ctrl,
+					curr_lens_pos,
+/*                                                                                               */
+//					&(move_params->
+//						ringing_params[a_ctrl->
+//						curr_region_index]),
+					&damping_param, // namkyu2.kang
+/*                                                                                               */
+					sign_dir,
+					target_lens_pos);
+			if (rc < 0) {
+				pr_err("%s: error:%d\n",
+					__func__, rc);
+				return rc;
+			}
+			curr_lens_pos = target_lens_pos;
+
+		} else {
+/*                                                                                               */
+			struct damping_params_t damping_param, *usr_damping_param ; // namkyu2.kang
+/*                                                                                               */
+			target_step_pos = step_boundary;
+			target_lens_pos =
+				a_ctrl->step_position_table_manual[target_step_pos];
+/*                                                                                               */
+			usr_damping_param = &(move_params->ringing_params[a_ctrl->curr_region_index]) ;
+			if (copy_from_user(&damping_param,
+					(void *)usr_damping_param,
+					sizeof(struct damping_params_t)))
+			{
+				pr_err("%s: ringing_param is on FAULT Address : %p\n",
+						__func__, (void *)usr_damping_param ) ;
+				return -EFAULT;
+			}
+/*                                                                                               */
+			rc = a_ctrl->func_tbl->
+				actuator_write_focus(
+					a_ctrl,
+					curr_lens_pos,
+/*                                                                                               */
+//					&(move_params->
+//						ringing_params[a_ctrl->
+//						curr_region_index]),
+					&damping_param, // namkyu2.kang
+/*                                                                                               */
+					sign_dir,
+					target_lens_pos);
+			if (rc < 0) {
+				pr_err("%s: error:%d\n",
+					__func__, rc);
+				return rc;
+			}
+			curr_lens_pos = target_lens_pos;
+
+			a_ctrl->curr_region_index += sign_dir;
+		}
+		a_ctrl->curr_step_pos = target_step_pos;
+	}
+
+	rc = msm_camera_i2c_write_table_w_microdelay(&a_ctrl->i2c_client,
+		a_ctrl->i2c_reg_tbl, a_ctrl->i2c_tbl_index,
+		a_ctrl->i2c_data_type);
+	if (rc < 0) {
+		pr_err("%s: i2c write error:%d\n",
+			__func__, rc);
+		return rc;
+	}
+	a_ctrl->i2c_tbl_index = 0;
+
+	return rc;
+}
+/*                                                                                   */
 
 static int32_t msm_actuator_init_step_table(struct msm_actuator_ctrl_t *a_ctrl,
 	struct msm_actuator_set_info_t *set_info)
@@ -405,6 +614,169 @@ static int32_t msm_actuator_init_step_table(struct msm_actuator_ctrl_t *a_ctrl,
 
 	return rc;
 }
+
+/*                                                                          */
+#if defined(CONFIG_IMX111)
+    extern uint8_t imx111_afcalib_data[4];
+#endif
+/*                                                                          */
+
+/*                                                                          */
+#ifdef SUPPORT_AF_CALIBRATION
+static int32_t msm_actuator_init_step_table_use_eeprom(struct msm_actuator_ctrl_t *a_ctrl,
+	struct msm_actuator_set_info_t *set_info)
+{
+	int32_t rc = 0;
+	int16_t cur_code = 0;
+	int16_t step_index = 0;
+	uint32_t max_code_size = 1;
+	uint16_t data_size = set_info->actuator_params.data_size;
+	uint16_t act_start = 0, act_macro = 0, move_range = 0;
+	/*                                                                                   */
+	uint16_t move_range_manual = 0;
+	/*                                                                                   */
+
+    for (; data_size > 0; data_size--)
+                max_code_size *= 2;
+
+    kfree(a_ctrl->step_position_table);
+    a_ctrl->step_position_table = NULL;
+
+	/*                                                                                   */
+	kfree(a_ctrl->step_position_table_manual);
+	a_ctrl->step_position_table_manual= NULL;
+	/*                                                                                   */
+
+        printk("[QCTK_EEPROM] %s called\n", __func__);
+        // read from eeprom
+    /*                                                                          */
+    #if defined(CONFIG_S5K4E5YA_EEPROM)
+	act_start = (uint16_t)(s5k4e5ya_afcalib_data[1] << 8) |
+			s5k4e5ya_afcalib_data[0];
+	act_macro = (uint16_t)(s5k4e5ya_afcalib_data[3] << 8) |
+			s5k4e5ya_afcalib_data[2];
+	printk("[QCTK_EEPROM][s5k4e5ya] %s: act_start = %d\n",__func__,act_start);
+	printk("[QCTK_EEPROM][s5k4e5ya] %s: act_macro = %d\n",__func__,act_macro);
+
+	if (act_start <= ACTUATOR_MIN_MOVE_RANGE || act_macro > ACTUATOR_MAX_MOVE_RANGE) {
+	    printk("[QTCK_EEPROM] Out of AF MIN-MAX Value, Not use eeprom\n");
+	    goto act_cal_fail;
+    }
+
+	if ((act_start < ACTUATOR_MIN_INFINIT_RANGE) || (act_start > ACTUATOR_MAX_INFINIT_RANGE)){
+		printk("[QTCK_EEPROM] Out of AF INFINIT calibration range, Not use eeprom\n");
+		goto act_cal_fail;
+	}
+
+	if ((act_macro < ACTUATOR_MIN_MACRO_RANGE) || (act_macro > ACTUATOR_MAX_MACRO_RANGE)){
+		printk("[QTCK_EEPROM] Out of AF MACRO calibration range, Not use eeprom\n");
+		goto act_cal_fail;
+	}
+
+	if (act_start >= act_macro){
+	    printk("[QTCK_EEPROM] Same as MIN and MAX Value, Not use eeprom\n");
+	    goto act_cal_fail;
+    }
+	#elif defined(CONFIG_IMX111)
+	act_start = (uint16_t)(imx111_afcalib_data[1] << 8) |
+			imx111_afcalib_data[0];
+	act_macro = (uint16_t)(imx111_afcalib_data[3] << 8) |
+			imx111_afcalib_data[2];
+	printk("[QCTK_EEPROM][IMX111] %s: act_start = %d\n",__func__,act_start);
+	printk("[QCTK_EEPROM][IMX111] %s: act_macro = %d\n",__func__,act_macro);
+	#endif
+	/*                                                                          */
+
+    /* Fill step position table */
+    a_ctrl->step_position_table =
+                kmalloc(sizeof(uint16_t) *
+                (set_info->af_tuning_params.total_steps + 1), GFP_KERNEL);
+
+    if (a_ctrl->step_position_table == NULL)
+                return -EFAULT;
+
+	/*                                                                                   */
+	a_ctrl->step_position_table_manual =
+				kmalloc(sizeof(uint16_t) *
+				(set_info->af_tuning_params.total_steps + 1), GFP_KERNEL);
+
+	if (a_ctrl->step_position_table_manual== NULL)
+		return -EFAULT;
+	/*                                                                                   */
+
+    //intial code
+    cur_code = set_info->af_tuning_params.initial_code;
+    a_ctrl->step_position_table[0] = a_ctrl->initial_code;
+
+
+    // start code - by calibration data
+    if (act_start > ACTUATOR_MARGIN)
+                a_ctrl->step_position_table[1] = act_start - ACTUATOR_MARGIN;
+    else
+                a_ctrl->step_position_table[1] = act_start;
+
+    move_range = act_macro - a_ctrl->step_position_table[1] + ACTUATOR_MARGIN;
+
+	/*                                                                                   */
+	if ( act_start > MANUAL_ACT_MARGIN )
+		a_ctrl->step_position_table_manual[1] = act_start - MANUAL_ACT_MARGIN;
+	else
+		a_ctrl->step_position_table_manual[1] = act_start ;
+
+	move_range_manual= act_macro - a_ctrl->step_position_table_manual[1] + MANUAL_ACT_MARGIN;
+	/*                                                                                   */
+
+	cur_code = set_info->af_tuning_params.initial_code;
+	a_ctrl->step_position_table_manual[step_index++] = cur_code;
+
+	//printk("[QCTK_EEPROM] move_range: %d\n", move_range);
+	//printk("[QCTK_EEPROM] a_ctrl->total_steps = %d\n",a_ctrl->total_steps);
+	//printk("[QCTK_EEPROM] set_info->af_tuning_params.total_steps = %d\n",set_info->af_tuning_params.total_steps);
+
+    //                                                                                                 
+	if (move_range < ACTUATOR_MIN_FOCUS_RANGE)
+	{
+	    printk("[QTCK_EEPROM] Not use eeprom\n");
+		goto act_cal_fail;
+	}
+	//                                                                                               
+
+	for (step_index = 2;step_index < set_info->af_tuning_params.total_steps;step_index++) {
+		a_ctrl->step_position_table[step_index]
+			= ((step_index - 1) * move_range + ((set_info->af_tuning_params.total_steps - 1) >> 1))
+			/ (set_info->af_tuning_params.total_steps - 1) + a_ctrl->step_position_table[1];
+
+		/*                                                                                   */
+		a_ctrl->step_position_table_manual[step_index]
+			= ((step_index - 1) * move_range_manual+ ((set_info->af_tuning_params.total_steps - 1) >> 1))
+			/ (set_info->af_tuning_params.total_steps - 1) + a_ctrl->step_position_table_manual[1];
+		/*                                                                                   */
+	}
+
+/*                                                                   */
+	//printk("Actuator Clibration table: start(%d),macro(%d) ==============\n",act_start, act_macro);
+        //
+	//for (step_index = 0; step_index < a_ctrl->total_steps; step_index++)
+	//	printk("step_position_table[%d]= %d\n",step_index, a_ctrl->step_position_table[step_index]);
+/*                                                                   */
+	/*                                                                                   */
+	//for (step_index = 0; step_index < a_ctrl->total_steps; step_index++)
+		//printk("step_position_table_manual[%d]= %d\n",step_index,a_ctrl->step_position_table_manual[step_index]);
+	/*                                                                                   */
+
+    a_ctrl->curr_step_pos = 0;
+    a_ctrl->curr_region_index = 0;
+
+	return rc;
+
+act_cal_fail:
+	pr_err("%s: calibration to default value not using eeprom data\n", __func__);
+	rc = msm_actuator_init_step_table(a_ctrl, set_info);
+	return rc;
+}
+/* QCT_CHANGED_E, add AF calibration parameters , 2012-08-06, kwangilc@qualcomm.com */
+#endif
+/*                                                                          */
 
 static int32_t msm_actuator_set_default_focus(
 	struct msm_actuator_ctrl_t *a_ctrl,
@@ -488,9 +860,21 @@ static int32_t msm_actuator_init(struct msm_actuator_ctrl_t *a_ctrl,
 		return -EFAULT;
 	}
 
+/*                                                                                                                                                   */
+#if 1
 	a_ctrl->i2c_reg_tbl =
 		kmalloc(sizeof(struct msm_camera_i2c_reg_tbl) *
-		(set_info->af_tuning_params.total_steps + 1), GFP_KERNEL);
+		((set_info->af_tuning_params.total_steps*2) + 1), GFP_KERNEL); 
+	
+		pr_err("%s: total_steps %d\n",	__func__, set_info->af_tuning_params.total_steps*2); /*                                                                           */
+		
+#else
+	a_ctrl->i2c_reg_tbl =
+		kmalloc(sizeof(struct msm_camera_i2c_reg_tbl) *
+		(set_info->af_tuning_params.total_steps + 1), GFP_KERNEL); 
+#endif
+/*                                                                                                                                                   */
+
 	if (!a_ctrl->i2c_reg_tbl) {
 		pr_err("%s kmalloc fail\n", __func__);
 		return -EFAULT;
@@ -584,7 +968,14 @@ static int32_t msm_actuator_config(struct msm_actuator_ctrl_t *a_ctrl,
 		if (rc < 0)
 			pr_err("%s move focus failed %d\n", __func__, rc);
 		break;
-
+	/*                                                                                   */
+	case CFG_MOVE_FOCUS_MANUAL:
+		rc = a_ctrl->func_tbl->actuator_move_focus_manual(a_ctrl,
+			&cdata.cfg.move);
+		if (rc < 0)
+			pr_err("%s init manaul table failed %d\n", __func__, rc);
+		break;
+	/*                                                                                   */
 	default:
 		break;
 	}
@@ -721,12 +1112,19 @@ static struct msm_actuator_ctrl_t msm_actuator_t = {
 static struct msm_actuator msm_vcm_actuator_table = {
 	.act_type = ACTUATOR_VCM,
 	.func_tbl = {
+#ifdef SUPPORT_AF_CALIBRATION
+		.actuator_init_step_table = msm_actuator_init_step_table_use_eeprom, /*                                                                        */
+#else
 		.actuator_init_step_table = msm_actuator_init_step_table,
+#endif
 		.actuator_move_focus = msm_actuator_move_focus,
 		.actuator_write_focus = msm_actuator_write_focus,
 		.actuator_set_default_focus = msm_actuator_set_default_focus,
 		.actuator_init_focus = msm_actuator_init_focus,
 		.actuator_parse_i2c_params = msm_actuator_parse_i2c_params,
+		/*                                                                                   */
+		.actuator_move_focus_manual = msm_actuator_move_focus_manual,
+		/*                                                                                   */
 	},
 };
 

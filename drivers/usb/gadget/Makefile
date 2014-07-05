@@ -34,6 +34,11 @@ obj-$(CONFIG_USB_CI13XXX_MSM)	+= ci13xxx_msm.o
 obj-$(CONFIG_USB_FUSB300)	+= fusb300_udc.o
 obj-$(CONFIG_USB_MSM_72K)	+= msm72k_udc.o
 
+# LGE_CHANGE
+# LGE android usb framework
+# 2012-09-08, sungho.jung@lge.com
+#
+obj-$(CONFIG_USB_LGE_ANDROID)	+= u_lgeusb.o
 #
 # USB gadget drivers
 #

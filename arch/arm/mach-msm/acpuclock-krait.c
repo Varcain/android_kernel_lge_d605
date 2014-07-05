@@ -434,6 +434,10 @@ module_param_named(boost, enable_boost, bool, S_IRUGO | S_IWUSR);
 
 static int calculate_vdd_core(const struct acpu_level *tgt)
 {
+#ifdef CONFIG_MACH_LGE
+/*                                                                   */
+	enable_boost= 1;
+#endif
 	return tgt->vdd_core + (enable_boost ? drv.boost_uv : 0);
 }
 

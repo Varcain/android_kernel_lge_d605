@@ -63,6 +63,7 @@ extern struct platform_device msm8960_device_uart_gsbi8;
 extern struct platform_device msm8930_device_uart_gsbi10;
 extern struct platform_device msm8930_device_uart_gsbi11;
 extern struct platform_device msm8960_device_ssbi_pmic;
+extern struct platform_device msm8960_device_qup_i2c_gsbi2; /*     */
 extern struct platform_device msm8960_device_qup_i2c_gsbi3;
 extern struct platform_device msm8960_device_qup_i2c_gsbi4;
 extern struct platform_device msm8960_device_qup_i2c_gsbi8;
@@ -225,6 +226,11 @@ extern struct platform_device msm_pcm_routing;
 extern struct platform_device msm_cpudai0;
 extern struct platform_device msm_cpudai1;
 extern struct platform_device mpq_cpudai_sec_i2s_rx;
+#ifdef CONFIG_FM_RADIO_MI2S_ENABLE
+extern struct platform_device msm8960_cpudai_slimbus_1_tx;
+extern struct platform_device msm8960_cpudai_slimbus_3_rx;
+extern struct platform_device msm_cpudai_mi2s;
+#endif
 extern struct platform_device msm8960_cpudai_slimbus_2_rx;
 extern struct platform_device msm8960_cpudai_slimbus_2_tx;
 extern struct platform_device msm_cpudai_hdmi_rx;

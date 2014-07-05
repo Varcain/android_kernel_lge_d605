@@ -1,6 +1,6 @@
 /* include/linux/lge_touch_core.h
  *
- * Copyright (C) 2011 LGE.
+ * Copyright (C) 2012 LGE.
  *
  * Writer: yehan.ahn@lge.com, 	hyesung.shin@lge.com
  *
@@ -18,15 +18,17 @@
 #ifndef LGE_TOUCH_SYNAPTICS_H
 #define LGE_TOUCH_SYNAPTICS_H
 
-#define ARRAYED_TOUCH_FW_BIN
-#define NUM_OF_EACH_FINGER_DATA_REG             5
-#define MAX_NUM_OF_FINGERS                      10
+//#define ARRAYED_TOUCH_FW_BIN
 
-#define DESCRIPTION_TABLE_START                 0xe9
-#define ANALOG_TABLE_START                      0xe9
-#define BUTTON_TABLE_START                      0xe3
+#define NUM_OF_EACH_FINGER_DATA_REG		5
+#define MAX_NUM_OF_FINGERS				5
 
-struct ts_function_descriptor {
+#define DESCRIPTION_TABLE_START			0xe9
+
+#define PAGE_SELECT_REG					0xFF		/* Button exists Page 02 */
+#define PAGE_MAX_NUM					4			/* number of page register */
+
+struct function_descriptor {
 	u8 	query_base;
 	u8 	command_base;
 	u8 	control_base;
@@ -35,8 +37,13 @@ struct ts_function_descriptor {
 	u8 	id;
 };
 
+struct ts_ic_function {
+	struct function_descriptor dsc;
+	u8 	function_page;
+};
+
 struct finger_data {
-	u8	finger_status_reg[3];
+	u8	finger_status_reg[2];
 	u8	finger_reg[MAX_NUM_OF_FINGERS][NUM_OF_EACH_FINGER_DATA_REG];
 };
 
@@ -52,39 +59,38 @@ struct cur_touch_data {
 	struct button_data	button;
 };
 
-struct interrupt_bit_mask {
-	u8 flash;
-	u8 status;
-	u8 abs;
-	u8 button;
+struct synaptics_ts_fw_info
+{
+	u8		fw_rev;
+	u8		fw_image_rev;
+	u8		manufacturer_id;
+	u8		product_id[11];
+	u8		fw_image_product_id[11];
+	u8		config_id[5];
+	u8		image_config_id[5];
+	unsigned char	*fw_start;
+	unsigned long	fw_size;
 };
 
 struct synaptics_ts_data {
 	u8	is_probed;
-	struct regulator                *regulator_vdd;
-	struct regulator                *regulator_vio;
-	struct i2c_client               *client;
-	struct touch_platform_data      *pdata;
-	struct ts_function_descriptor   common_dsc;
-	struct ts_function_descriptor   finger_dsc;
-	struct ts_function_descriptor   button_dsc;
-	struct ts_function_descriptor   flash_dsc;
-	struct cur_touch_data           ts_data;
-	struct touch_fw_info            *fw_info;
-	struct interrupt_bit_mask       interrupt_mask;
-#if defined(CONFIG_TOUCH_REG_MAP_TM2000) || defined(CONFIG_TOUCH_REG_MAP_TM2372)
-	struct ts_function_descriptor   analog_dsc;
-#endif
-
-#if defined(CONFIG_TOUCH_REG_MAP_TM2000) || defined(CONFIG_TOUCH_REG_MAP_TM2372)
-	u8                              ic_panel_type;
-#endif
+	struct regulator*	regulator_vdd;
+	struct regulator*	regulator_vio;
+	struct i2c_client*	client;
+	struct touch_platform_data*		pdata;
+	struct ts_ic_function	common_fc;
+	struct ts_ic_function	finger_fc;
+	struct ts_ic_function	button_fc;
+	struct ts_ic_function	analog_fc;	/* FIXME: not used in ClearPad3000 serise */
+	struct ts_ic_function	flash_fc;
+	struct cur_touch_data	ts_data;
+	struct synaptics_ts_fw_info	fw_info;
 };
-
-#if defined(CONFIG_TOUCH_REG_MAP_TM2000) || defined(CONFIG_TOUCH_REG_MAP_TM2372)
-enum {IC7020_GFF, IC7020_G2, IC3203_G2, IC7020_GFF_H_PTN, IC7020_G2_H_PTN};
-#endif
 
 /* extern function */
 extern int FirmwareUpgrade(struct synaptics_ts_data *ts, const char* fw_path);
+int synaptics_ts_page_data_read(struct i2c_client *client, u8 page, u8 reg, int size, u8 *data);
+int synaptics_ts_page_data_write(struct i2c_client *client, u8 page, u8 reg, int size, u8 *data);
+int synaptics_ts_page_data_write_byte(struct i2c_client *client, u8 page, u8 reg, u8 data);
+
 #endif

@@ -210,6 +210,8 @@ static int soc_pcm_open(struct snd_pcm_substream *substream)
 	struct snd_soc_dai_driver *codec_dai_drv = codec_dai->driver;
 	int ret = 0;
 
+	/*            */
+	printk("%s - %s \n",__func__,rtd->dai_link->name);
 	pm_runtime_get_sync(cpu_dai->dev);
 	pm_runtime_get_sync(codec_dai->dev);
 	pm_runtime_get_sync(platform->dev);
@@ -443,6 +445,9 @@ static int soc_pcm_close(struct snd_pcm_substream *substream)
 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
 	struct snd_soc_codec *codec = rtd->codec;
+    
+	/*            */
+	printk("%s - %s \n",__func__,rtd->dai_link->name);
 
 	mutex_lock_nested(&rtd->pcm_mutex, rtd->pcm_subclass);
 
@@ -859,7 +864,8 @@ static inline int be_connect(struct snd_soc_pcm_runtime *fe,
 	list_add(&dpcm_params->list_be, &fe->dpcm[stream].be_clients);
 	list_add(&dpcm_params->list_fe, &be->dpcm[stream].fe_clients);
 
-	dev_dbg(fe->dev, "  connected new DSP %s path %s %s %s\n",
+	/*                        */
+	printk("  connected new DSP %s path %s %s %s\n",
 			stream ? "capture" : "playback",  fe->dai_link->name,
 			stream ? "<-" : "->", be->dai_link->name);
 
@@ -2030,6 +2036,7 @@ int soc_dpcm_runtime_update(struct snd_soc_dapm_widget *widget)
 
 		paths = fe_path_get(fe, SNDRV_PCM_STREAM_PLAYBACK, &list);
 		if (paths < 0) {
+			fe_path_put(&list);
 			pr_warn_ratelimited("%s no valid %s route from source to sink\n",
 					fe->dai_link->name,  "playback");
 			WARN_ON(1);
@@ -2062,6 +2069,7 @@ capture:
 
 		paths = fe_path_get(fe, SNDRV_PCM_STREAM_CAPTURE, &list);
 		if (paths < 0) {
+			fe_path_put(&list);
 			pr_warn_ratelimited("%s no valid %s route from source to sink\n",
 					fe->dai_link->name,  "capture");
 			ret = paths;
@@ -2438,8 +2446,10 @@ int soc_dpcm_fe_dai_open(struct snd_pcm_substream *fe_substream)
 	fe->dpcm[stream].runtime = fe_substream->runtime;
 
 	if (fe_path_get(fe, stream, &list) <= 0) {
+		fe_path_put(&list);
 		pr_warn_ratelimited("asoc: %s no valid %s route from source to sink\n",
 			fe->dai_link->name, stream ? "capture" : "playback");
+			fe_path_put(&list);
 			return -EINVAL;
 	}
 

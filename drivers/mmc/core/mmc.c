@@ -464,6 +464,10 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 
 	if (card->ext_csd.rev >= 5) {
 		/* check whether the eMMC card supports BKOPS */
+#ifdef CONFIG_LGE_MMC_BKOPS_DISABLE
+// disable BKOPS
+		pr_info("BKOPS unsupport\n");
+#else
 		if (ext_csd[EXT_CSD_BKOPS_SUPPORT] & 0x1) {
 			card->ext_csd.bkops = 1;
 			card->ext_csd.bkops_en = ext_csd[EXT_CSD_BKOPS_EN];
@@ -483,7 +487,7 @@ static int mmc_read_ext_csd(struct mmc_card *card, u8 *ext_csd)
 				pr_info("%s: BKOPS_EN bit is not set\n",
 					mmc_hostname(card->host));
 		}
-
+#endif
 		/* check whether the eMMC card supports HPI */
 		if (ext_csd[EXT_CSD_HPI_FEATURES] & 0x1) {
 			card->ext_csd.hpi = 1;

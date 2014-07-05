@@ -314,6 +314,35 @@ static struct socinfo_v1 dummy_socinfo = {
 	.format = 1,
 	.version = 1,
 };
+/*                                            */
+#ifdef CONFIG_LGE_PM
+u16 *poweron_st = 0;
+uint16_t power_on_status_info_get(void)
+{
+    poweron_st = smem_alloc(SMEM_POWER_ON_STATUS_INFO, sizeof(poweron_st));
+
+    if( poweron_st == NULL ) return 0 ;
+    return *poweron_st;
+}
+EXPORT_SYMBOL(power_on_status_info_get);
+
+#ifdef CONFIG_LGE_PM_BATTERY_ID_CHECKER
+u32 *batt_info = 0;
+uint32_t battery_info_get(void)
+{
+    batt_info = smem_alloc(SMEM_BATT_INFO, sizeof(batt_info));
+
+    if (batt_info == NULL) {
+		pr_err("%s: smem_alloc returns NULL\n", __func__);
+		return 0;
+    }
+
+    return *batt_info;
+}
+EXPORT_SYMBOL(battery_info_get);
+#endif
+#endif
+/*                                 */
 
 uint32_t socinfo_get_id(void)
 {
@@ -330,6 +359,39 @@ char *socinfo_get_build_id(void)
 {
 	return (socinfo) ? socinfo->v1.build_id : NULL;
 }
+
+/*           
+                                         
+                                    
+                                 
+                                                                  
+*/
+#if defined(CONFIG_ARCH_MSM8960) || defined(CONFIG_ARCH_MSM8930)
+#define SOCINFO_SERIAL_NUM_ADDR    0x007040B8
+
+#include <linux/io.h>
+uint32_t socinfo_get_serial_number(void)
+{
+    uint32_t serial_number;
+    void __iomem *tmp;
+
+    /* "LG-P650 rev.A" and "LS720 rev.B" are ES1 chipset.
+     * This is a unique 32-bit serial number blown into the chip during 
+     * wafer sort to track information like wafer number of coordinates of the chip.
+     */
+    if (SOCINFO_VERSION_MAJOR(socinfo_get_version()) < 0)
+    {
+        printk("%s: soc version : %d\n", __func__, SOCINFO_VERSION_MAJOR(socinfo_get_version()) );
+        return 0;
+    }
+
+    tmp = ioremap(SOCINFO_SERIAL_NUM_ADDR, 0x4);
+    serial_number = (uint32_t)readl(tmp);
+    iounmap(tmp);
+
+	return serial_number;
+}
+#endif
 
 uint32_t socinfo_get_raw_id(void)
 {
@@ -440,6 +502,25 @@ socinfo_show_build_id(struct sys_device *dev,
 
 	return snprintf(buf, PAGE_SIZE, "%-.32s\n", socinfo_get_build_id());
 }
+
+/*           
+                                                                  
+                                  
+ */
+#if defined(CONFIG_ARCH_MSM8960) || defined(CONFIG_ARCH_MSM8930)
+static ssize_t
+socinfo_show_serial_number(struct sys_device *dev,
+		      struct sysdev_attribute *attr,
+		      char *buf)
+{
+	if (!socinfo) {
+		pr_err("%s: No socinfo found!\n", __func__);
+		return 0;
+	}
+
+	return snprintf(buf, PAGE_SIZE, "%x\n", socinfo_get_serial_number());
+}
+#endif
 
 static ssize_t
 socinfo_show_raw_id(struct sys_device *dev,
@@ -603,6 +684,13 @@ static struct sysdev_attribute socinfo_v1_files[] = {
 	_SYSDEV_ATTR(id, 0444, socinfo_show_id, NULL),
 	_SYSDEV_ATTR(version, 0444, socinfo_show_version, NULL),
 	_SYSDEV_ATTR(build_id, 0444, socinfo_show_build_id, NULL),
+/*           
+                                                                  
+                                  
+ */
+#if defined(CONFIG_ARCH_MSM8960) || defined(CONFIG_ARCH_MSM8930)
+	_SYSDEV_ATTR(serial_number, 0444, socinfo_show_serial_number, NULL),
+#endif
 };
 
 static struct sysdev_attribute socinfo_v2_files[] = {
@@ -742,6 +830,11 @@ static void * __init setup_dummy_socinfo(void)
 			sizeof(dummy_socinfo.build_id));
 	} else if (machine_is_msm8625_rumi3())
 		dummy_socinfo.id = 127;
+	else if (early_machine_is_mpq8092()) {
+		dummy_socinfo.id = 146;
+		strlcpy(dummy_socinfo.build_id, "mpq8092 - ",
+		sizeof(dummy_socinfo.build_id));
+	}
 	strlcat(dummy_socinfo.build_id, "Dummy socinfo",
 		sizeof(dummy_socinfo.build_id));
 	return (void *) &dummy_socinfo;

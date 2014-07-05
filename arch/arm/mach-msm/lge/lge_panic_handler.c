@@ -9,7 +9,7 @@
  *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  */
 
@@ -21,26 +21,29 @@
 #include <linux/delay.h>
 #include <linux/io.h>
 #include <linux/module.h>
-#include <linux/persistent_ram.h>
 #include <asm/setup.h>
 #include <mach/board_lge.h>
+#include <mach/msm_iomap.h>
 
 #include <mach/subsystem_restart.h>
 #ifdef CONFIG_CPU_CP15_MMU
+/*           
+                                                                  
+                                 
+ */
 #include <linux/ptrace.h>
 #endif
 
 #define PANIC_HANDLER_NAME "panic-handler"
 #define PANIC_DUMP_CONSOLE 0
 #define PANIC_MAGIC_KEY    0x12345678
-#define NORMAL_MAGIC_KEY   0x4E4F524D
 #define CRASH_ARM9         0x87654321
 #define CRASH_REBOOT       0x618E1000
 
 struct crash_log_dump {
-	unsigned int magic_key;
-	unsigned int size;
-	unsigned char buffer[0];
+	unsigned int	magic_key;
+	unsigned int	size;
+	unsigned char	buffer[0];
 };
 
 static struct crash_log_dump *crash_dump_log;
@@ -48,160 +51,135 @@ static unsigned int crash_buf_size = 0;
 static int crash_store_flag = 0;
 
 #ifdef CONFIG_CPU_CP15_MMU
-unsigned long *cpu_crash_ctx=NULL;
+/*           
+                                                                  
+                                 
+ */
+unsigned long *cpu_crash_ctx = NULL;
 #endif
+extern void lge_set_kernel_crash_magic(void);
 
 unsigned int msm_mmuctrl;
 unsigned int msm_mmudac;
 
 void store_ctrl(void)
 {
-	asm("mrc p15, 0, %0, c1, c0, 0\n"
-			: "=r" (msm_mmuctrl));
+	asm ("mrc p15, 0, %0, c1, c0, 0\n"
+	     : "=r" (msm_mmuctrl));
 }
 
 void store_dac(void)
 {
-	asm("mrc p15, 0, %0, c3, c0, 0\n"
-			: "=r" (msm_mmudac));
+	asm ("mrc p15, 0, %0, c3, c0, 0\n"
+	     : "=r" (msm_mmudac));
 }
-static DEFINE_SPINLOCK(panic_lock);
+static DEFINE_SPINLOCK(lge_panic_lock);
 
 static int dummy_arg;
 static int gen_bug(const char *val, struct kernel_param *kp)
 {
 	BUG();
+
 	return 0;
 }
-module_param_call(gen_bug, gen_bug, param_get_bool,
-		&dummy_arg, S_IWUSR | S_IRUGO);
+module_param_call(gen_bug, gen_bug, param_get_bool, &dummy_arg, S_IWUSR | S_IRUGO);
 
 static int gen_panic(const char *val, struct kernel_param *kp)
 {
 	panic("generate test-panic");
+
 	return 0;
 }
-module_param_call(gen_panic, gen_panic, param_get_bool,
-		&dummy_arg, S_IWUSR | S_IRUGO);
+module_param_call(gen_panic, gen_panic, param_get_bool, &dummy_arg, S_IWUSR | S_IRUGO);
 
-static int gen_mdm_ssr(const char *val, struct kernel_param *kp)
-{
-	subsystem_restart("external_modem");
-	return 0;
-}
-module_param_call(gen_mdm_ssr, gen_mdm_ssr, param_get_bool,
-		&dummy_arg, S_IWUSR | S_IRUGO);
-
-static int gen_modem_ssr(const char *val, struct kernel_param *kp)
+static int gen_modem_panic(const char *val, struct kernel_param *kp)
 {
 	subsystem_restart("modem");
 	return 0;
 }
-module_param_call(gen_modem_ssr, gen_modem_ssr, param_get_bool,
-		&dummy_arg, S_IWUSR | S_IRUGO);
+module_param_call(gen_modem_panic, gen_modem_panic, param_get_bool, &dummy_arg, S_IWUSR | S_IRUGO);
 
-static int gen_riva_ssr(const char *val, struct kernel_param *kp)
+static int gen_riva_panic(const char *val, struct kernel_param *kp)
 {
 	subsystem_restart("riva");
 	return 0;
 }
-module_param_call(gen_riva_ssr, gen_riva_ssr, param_get_bool,
-		&dummy_arg, S_IWUSR | S_IRUGO);
-
-static int gen_dsps_ssr(const char *val, struct kernel_param *kp)
+module_param_call(gen_riva_panic, gen_riva_panic, param_get_bool, &dummy_arg, S_IWUSR | S_IRUGO);
+static int gen_dsps_panic(const char *val, struct kernel_param *kp)
 {
 	subsystem_restart("dsps");
 	return 0;
 }
-module_param_call(gen_dsps_ssr, gen_dsps_ssr, param_get_bool,
-		&dummy_arg, S_IWUSR | S_IRUGO);
+module_param_call(gen_dsps_panic, gen_dsps_panic, param_get_bool, &dummy_arg, S_IWUSR | S_IRUGO);
 
-static int gen_lpass_ssr(const char *val, struct kernel_param *kp)
+static int gen_lpass_panic(const char *val, struct kernel_param *kp)
 {
 	subsystem_restart("lpass");
 	return 0;
 }
-module_param_call(gen_lpass_ssr, gen_lpass_ssr, param_get_bool,
-		&dummy_arg, S_IWUSR | S_IRUGO);
+module_param_call(gen_lpass_panic, gen_lpass_panic, param_get_bool, &dummy_arg, S_IWUSR | S_IRUGO);
 
-#define WDT0_RST        0x38
-#define WDT0_EN         0x40
-#define WDT0_BARK_TIME  0x4C
-#define WDT0_BITE_TIME  0x5C
-
-extern void __iomem *msm_timer_get_timer0_base(void);
-
-static int gen_wdt_bark(const char *val, struct kernel_param *kp)
-{
-	static void __iomem *msm_tmr0_base;
-	msm_tmr0_base = msm_timer_get_timer0_base();
-	__raw_writel(0, msm_tmr0_base + WDT0_EN);
-	__raw_writel(1, msm_tmr0_base + WDT0_RST);
-	__raw_writel(0x31F3, msm_tmr0_base + WDT0_BARK_TIME);
-	__raw_writel(5 * 0x31F3, msm_tmr0_base + WDT0_BITE_TIME);
-	__raw_writel(1, msm_tmr0_base + WDT0_EN);
-	return 0;
-}
-module_param_call(gen_wdt_bark, gen_wdt_bark, param_get_bool,
-		&dummy_arg, S_IWUSR | S_IRUGO);
-
-static int gen_hw_reset(const char *val, struct kernel_param *kp)
-{
-	static void __iomem *msm_tmr0_base;
-	msm_tmr0_base = msm_timer_get_timer0_base();
-	__raw_writel(0, msm_tmr0_base + WDT0_EN);
-	__raw_writel(1, msm_tmr0_base + WDT0_RST);
-	__raw_writel(5 * 0x31F3, msm_tmr0_base + WDT0_BARK_TIME);
-	__raw_writel(0x31F3, msm_tmr0_base + WDT0_BITE_TIME);
-	__raw_writel(1, msm_tmr0_base + WDT0_EN);
-	return 0;
-}
-module_param_call(gen_hw_reset, gen_hw_reset, param_get_bool,
-		&dummy_arg, S_IWUSR | S_IRUGO);
+static int crash_handle_enable = 1;
+module_param_named(crash_handle_enable, crash_handle_enable,
+		   int, S_IRUGO | S_IWUSR | S_IWGRP);
 
 void set_crash_store_enable(void)
 {
-	if (crash_dump_log->magic_key == NORMAL_MAGIC_KEY)
-		crash_store_flag = 1;
+	crash_store_flag = 1;
+
 	return;
 }
 
 void set_crash_store_disable(void)
 {
 	crash_store_flag = 0;
+
 	return;
 }
 
 void store_crash_log(char *p)
 {
+	if (!crash_dump_log)
+		return;
+
 	if (!crash_store_flag)
 		return;
-	if (crash_dump_log->size == crash_buf_size)
-		return;
-	for ( ; *p; p++) {
+
+	for (; *p; p++) {
 		if (*p == '[') {
-			for ( ; *p != ']'; p++)
+			for (; *p != ']'; p++)
 				;
 			p++;
 			if (*p == ' ')
 				p++;
 		}
+
 		if (*p == '<') {
-			for ( ; *p != '>'; p++)
+			for (; *p != '>'; p++)
 				;
 			p++;
 		}
-		crash_dump_log->buffer[crash_dump_log->size] = *p;
-		crash_dump_log->size++;
+
+		/* check a buffer */
+		if (crash_dump_log->size >= crash_buf_size)
+			crash_dump_log->size = 0;
+		crash_dump_log->buffer[crash_dump_log->size++] = *p;
 	}
-	crash_dump_log->buffer[crash_dump_log->size] = 0;
+
+	/* check a buffer */
+	if (crash_dump_log->size >= crash_buf_size)
+		crash_dump_log->size = 0;
+	crash_dump_log->buffer[crash_dump_log->size++] = 0;
 
 	return;
 }
 
 #ifdef CONFIG_CPU_CP15_MMU
-void lge_save_ctx(struct pt_regs* regs, unsigned int ctrl,
-		unsigned int transbase, unsigned int dac)
+/*           
+                                                                  
+                                 
+ */
+void lge_save_ctx(struct pt_regs *regs, unsigned int ctrl, unsigned int transbase, unsigned int dac)
 {
 	/* save cpu register for simulation */
 	cpu_crash_ctx[0] = regs->ARM_r0;
@@ -228,64 +206,302 @@ void lge_save_ctx(struct pt_regs* regs, unsigned int ctrl,
 }
 #endif
 
-static int restore_crash_log(struct notifier_block *this,
-		unsigned long event, void *ptr)
+static int restore_crash_log(struct notifier_block *this, unsigned long event,
+			     void *ptr)
 {
 	unsigned long flags;
+
 	crash_store_flag = 0;
-	spin_lock_irqsave(&panic_lock, flags);
+
+	spin_lock_irqsave(&lge_panic_lock, flags);
+
+#if 0
+	printk(KERN_EMERG "%s", crash_dump_log->buffer);
+	printk(KERN_EMERG "%s: buffer size %d\n", __func__, crash_dump_log->size);
+	printk(KERN_EMERG "%s: %d\n", __func__, crash_buf_size);
+#endif
+#ifndef CONFIG_ARCH_MSM8960
+	lge_set_reboot_reason(CRASH_REBOOT);
+#endif
 	crash_dump_log->magic_key = PANIC_MAGIC_KEY;
-	spin_unlock_irqrestore(&panic_lock, flags);
+
+	spin_unlock_irqrestore(&lge_panic_lock, flags);
 
 	return NOTIFY_DONE;
 }
 
 static struct notifier_block panic_handler_block = {
-	.notifier_call = restore_crash_log,
+	.notifier_call	= restore_crash_log,
 };
 
-static int __init panic_handler_probe(struct platform_device *pdev)
+#ifdef CONFIG_LGE_HIDDEN_RESET
+#define HRESET_MAGIC  0x12345678
+
+struct hidden_reset_flag {
+	unsigned int	magic_key;
+	unsigned long	fb_addr;
+	unsigned long	fb_size;
+};
+
+struct hidden_reset_flag *hreset_flag = NULL;
+
+int hreset_enable = 0;
+static int hreset_enable_set(const char *val, struct kernel_param *kp)
 {
-	struct persistent_ram_zone *prz;
+	int ret;
+
+	ret = param_set_int(val, kp);
+	if (ret)
+		return ret;
+
+	if (hreset_enable) {
+		if (hreset_flag)
+			hreset_flag->magic_key = HRESET_MAGIC;
+		pr_info("hidden reset activated\n");
+
+		/* clear dload magic */
+		__raw_writel(0, MSM_IMEM_BASE);
+		__raw_writel(0, MSM_IMEM_BASE + 4);
+	} else {
+		if (hreset_flag)
+			hreset_flag->magic_key = 0;
+		pr_info("hidden reset deactivated\n");
+	}
+
+	return 0;
+}
+module_param_call(hreset_enable, hreset_enable_set, param_get_int,
+		  &hreset_enable, S_IRUGO | S_IWUSR | S_IWGRP);
+
+int on_hidden_reset = 0;
+module_param_named(on_hidden_reset, on_hidden_reset,
+		   int, S_IRUGO | S_IWUSR | S_IWGRP);
+
+static int __init check_hidden_reset(char *reset_mode)
+{
+	if (!strncmp(reset_mode, "on", 2)) {
+		on_hidden_reset = 1;
+		printk(KERN_INFO "reboot mode : hidden reset %s\n", "on");
+	}
+	return 1;
+}
+__setup("lge.hreset=", check_hidden_reset);
+
+static ssize_t is_hidden_show(struct device *dev, struct device_attribute *addr,
+			      char *buf)
+{
+	return sprintf(buf, "%d\n", on_hidden_reset);
+}
+
+static DEVICE_ATTR(is_hreset, S_IRUGO | S_IWUSR | S_IWGRP, is_hidden_show, NULL);
+#endif
+
+/*                                                    */
+char cable_detect_value[2];
+
+
+int get_detected_cable(void)
+{
+	int ret = 3;
+
+	switch (cable_detect_value[0]) {
+	case 'a':
+		ret = 0;
+		break;
+	case 'b':
+		ret = 1;
+		break;
+	case 'c':
+		ret = 2;
+		break;
+	case 'd':
+		ret = 3;
+		break;
+	case 'e':
+		ret = 4;
+		break;
+	case 'f':
+		ret = 5;
+		break;
+	case 'g':
+		ret = 6;
+		break;
+	case 'h':
+		ret = 7;
+		break;
+	case 'i':
+		ret = 8;
+		break;
+	case 'j':
+		ret = 9;
+		break;
+	case 'k':
+		ret = 10;
+		break;
+	case 'l':
+		ret = 11;
+		break;
+	case 'm':
+		ret = 12;
+		break;
+	case 'n':
+		ret = 13;
+		break;
+	case 'o':
+		ret = 14;
+		break;
+
+	default:
+		ret = 3;
+		break;
+	}
+	return ret;
+}
+EXPORT_SYMBOL(get_detected_cable);
+
+
+static ssize_t DETECTED_cable_read(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	int count;
+
+	count = sprintf(buf, "%s", cable_detect_value);
+
+	return count;
+}
+
+
+
+static ssize_t DETECTED_cable_write(struct device *dev, struct device_attribute *attr, const char *buf, size_t size)
+{
+	snprintf(cable_detect_value, sizeof(cable_detect_value), "%s", buf);
+
+	return size;
+}
+
+static DEVICE_ATTR(DETECTED_cable, S_IRUGO | S_IWUSR | S_IXOTH, DETECTED_cable_read, DETECTED_cable_write);
+/*                                                    */
+
+
+
+static int __init lge_panic_handler_probe(struct platform_device *pdev)
+{
+	struct resource *res = pdev->resource;
+	size_t start;
 	size_t buffer_size;
 	void *buffer;
 	int ret = 0;
+
 #ifdef CONFIG_CPU_CP15_MMU
+/*           
+                                                                  
+                                 
+ */
 	void *ctx_buf;
+	size_t ctx_start;
+#endif
+#ifdef CONFIG_LGE_HIDDEN_RESET
+	void *hreset_flag_buf;
 #endif
 
-	prz = persistent_ram_init_ringbuffer(&pdev->dev, false);
-	if (IS_ERR(prz))
-		return PTR_ERR(prz);
+/*                                                    */
+	struct class *detected_cable_class;
+	struct device *detected_cable_dev;
+/*                                                    */
 
-	buffer_size = prz->buffer_size - SZ_1K;
-	buffer = (void *)prz->buffer;;
+
+/*                                                    */
+	detected_cable_class = class_create(THIS_MODULE, "detected_cable_class");
+	if (IS_ERR(detected_cable_class))
+		printk("Failed to create class(detected_cable)!\n");
+
+	detected_cable_dev = device_create(detected_cable_class, NULL, 0, NULL, "detected_cable_dev");
+	if (IS_ERR(detected_cable_dev))
+		printk("Failed to create device(detected_cable)!\n");
+
+	if (device_create_file(detected_cable_dev, &dev_attr_DETECTED_cable) < 0)
+		printk("Failed to create device file(%s)!\n", dev_attr_DETECTED_cable.attr.name);
+
+/*                                                    */
+
+
+	if (res == NULL || pdev->num_resources != 1 ||
+	    !(res->flags & IORESOURCE_MEM)) {
+		printk(KERN_ERR "lge_panic_handler: invalid resource, %p %d flags "
+		       "%lx\n", res, pdev->num_resources, res ? res->flags : 0);
+		return -ENXIO;
+	}
+
+	buffer_size = res->end - res->start + 1;
+	start = res->start;
+	printk(KERN_INFO "lge_panic_handler: got buffer at %zx, size %zx\n",
+	       start, buffer_size);
+	buffer = ioremap(res->start, buffer_size);
+	if (buffer == NULL) {
+		printk(KERN_ERR "lge_panic_handler: failed to map memory\n");
+		return -ENOMEM;
+	}
 
 	crash_dump_log = (struct crash_log_dump *)buffer;
 	memset(crash_dump_log, 0, buffer_size);
-	crash_dump_log->magic_key = NORMAL_MAGIC_KEY;
+	crash_dump_log->magic_key = 0;
 	crash_dump_log->size = 0;
 	crash_buf_size = buffer_size - offsetof(struct crash_log_dump, buffer);
 #ifdef CONFIG_CPU_CP15_MMU
-	ctx_buf = (void *)(buffer + buffer_size);
+/*           
+                                                                  
+                                 
+ */
+	ctx_start = res->end + 1;
+	ctx_buf = ioremap(ctx_start, 1024);
+	if (ctx_buf == NULL) {
+		printk(KERN_ERR "cpu crash ctx buffer: failed to map memory\n");
+		return -ENOMEM;
+	}
 	cpu_crash_ctx = (unsigned long *)ctx_buf;
 #endif
-	atomic_notifier_chain_register(&panic_notifier_list,
-			&panic_handler_block);
+#ifdef CONFIG_LGE_HIDDEN_RESET
+	hreset_flag_buf = ioremap((res->end + 1024 + 1), 1024);
+	if (!hreset_flag_buf) {
+		pr_err("hreset flag buffer: failed to map memory\n");
+		return -ENOMEM;
+	}
+
+	hreset_flag = (struct hidden_reset_flag *)hreset_flag_buf;
+
+	ret = device_create_file(&pdev->dev, &dev_attr_is_hreset);
+	if (ret < 0) {
+		printk(KERN_ERR "device_create_file error!\n");
+		return ret;
+	}
+
+	if (hreset_enable)
+		hreset_flag->magic_key = HRESET_MAGIC;
+	else
+		hreset_flag->magic_key = 0;
+
+	if (lge_get_fb_phys_info(&hreset_flag->fb_addr, &hreset_flag->fb_size)) {
+		hreset_flag->magic_key = 0;
+		pr_err("hreset_flag: failed to get_fb_phys_info\n");
+	}
+#endif
+
+	/* Setup panic notifier */
+	atomic_notifier_chain_register(&panic_notifier_list, &panic_handler_block);
+
 	return ret;
 }
 
-static int __devexit panic_handler_remove(struct platform_device *pdev)
+static int __devexit lge_panic_handler_remove(struct platform_device *pdev)
 {
 	return 0;
 }
 
 static struct platform_driver panic_handler_driver __refdata = {
-	.probe = panic_handler_probe,
-	.remove = __devexit_p(panic_handler_remove),
-	.driver = {
-		.name = PANIC_HANDLER_NAME,
-		.owner = THIS_MODULE,
+	.probe		= lge_panic_handler_probe,
+	.remove		= __devexit_p(lge_panic_handler_remove),
+	.driver		= {
+		.name	= PANIC_HANDLER_NAME,
+		.owner	= THIS_MODULE,
 	},
 };
 

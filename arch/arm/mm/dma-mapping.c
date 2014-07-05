@@ -856,6 +856,13 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
 	size_t size, enum dma_data_direction dir,
 	void (*op)(const void *, size_t, int))
 {
+#if defined(CONFIG_MACH_LGE_L9II_COMMON)
+	unsigned long pfn;
+	size_t left = size;
+
+	pfn = page_to_pfn(page) + offset / PAGE_SIZE;
+	offset %= PAGE_SIZE;
+#else
 	/*
 	 * A single sg entry may refer to multiple physically contiguous
 	 * pages.  But we still need to process highmem pages individually.
@@ -863,11 +870,20 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
 	 * optimized out.
 	 */
 	size_t left = size;
+#endif
 	do {
 		size_t len = left;
 		void *vaddr;
 
+#if defined(CONFIG_MACH_LGE_L9II_COMMON)
+		page = pfn_to_page(pfn);
+#endif
+
 		if (PageHighMem(page)) {
+#if defined(CONFIG_MACH_LGE_L9II_COMMON)
+			if (len + offset > PAGE_SIZE) 
+				len = PAGE_SIZE - offset;
+#else
 			if (len + offset > PAGE_SIZE) {
 				if (offset >= PAGE_SIZE) {
 					page += offset / PAGE_SIZE;
@@ -875,7 +891,7 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
 				}
 				len = PAGE_SIZE - offset;
 			}
-
+#endif
 			if (cache_is_vipt_nonaliasing()) {
 				vaddr = kmap_atomic(page);
 				op(vaddr + offset, len, dir);
@@ -892,7 +908,11 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
 			op(vaddr, len, dir);
 		}
 		offset = 0;
+#if defined(CONFIG_MACH_LGE_L9II_COMMON)
+		pfn++;
+#else
 		page++;
+#endif
 		left -= len;
 	} while (left);
 }

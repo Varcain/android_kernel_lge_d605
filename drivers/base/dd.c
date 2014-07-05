@@ -160,6 +160,10 @@ static int deferred_probe_initcall(void)
 
 	driver_deferred_probe_enable = true;
 	driver_deferred_probe_trigger();
+#if defined (CONFIG_MACH_LGE_L9II_COMMON)
+	/* Sort as many dependencies as possible before exiting initcalls */
+	flush_workqueue(deferred_wq);
+#endif
 	return 0;
 }
 late_initcall(deferred_probe_initcall);

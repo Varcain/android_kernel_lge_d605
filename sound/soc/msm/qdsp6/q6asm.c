@@ -285,62 +285,62 @@ int q6asm_audio_client_buf_free_contiguous(unsigned int dir,
 	int cnt = 0;
 	int rc = 0;
 	pr_debug("%s: Session id %d\n", __func__, ac->session);
-	mutex_lock(&ac->cmd_lock);
-	port = &ac->port[dir];
-	if (!port->buf) {
-		mutex_unlock(&ac->cmd_lock);
-		return 0;
-	}
-	cnt = port->max_buf_cnt - 1;
+        mutex_lock(&ac->cmd_lock);
+        port = &ac->port[dir];
+        if (!port->buf) {
+            mutex_unlock(&ac->cmd_lock);
+            return 0;
+        }
+        cnt = port->max_buf_cnt - 1;
 
-	if (cnt >= 0) {
-		rc = q6asm_memory_unmap(ac, port->buf[0].phys, dir);
-		if (rc < 0)
-			pr_err("%s CMD Memory_unmap_regions failed\n",
-							__func__);
-	}
+        if (cnt >= 0) {
+            rc = q6asm_memory_unmap(ac, port->buf[0].phys, dir);
+            if (rc < 0)
+                pr_err("%s CMD Memory_unmap_regions failed\n",
+                        __func__);
+        }
 
-	if (port->buf[0].data) {
+        if (port->buf[0].data) {
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-		ion_unmap_kernel(port->buf[0].client, port->buf[0].handle);
-		ion_free(port->buf[0].client, port->buf[0].handle);
-		ion_client_destroy(port->buf[0].client);
-		pr_debug("%s:data[%p]phys[%p][%p], client[%p] handle[%p]\n",
-			__func__,
-			(void *)port->buf[0].data,
-			(void *)port->buf[0].phys,
-			(void *)&port->buf[0].phys,
-			(void *)port->buf[0].client,
-			(void *)port->buf[0].handle);
+            ion_unmap_kernel(port->buf[0].client, port->buf[0].handle);
+            ion_free(port->buf[0].client, port->buf[0].handle);
+            ion_client_destroy(port->buf[0].client);
+            pr_debug("%s:data[%p]phys[%p][%p], client[%p] handle[%p]\n",
+                    __func__,
+                    (void *)port->buf[0].data,
+                    (void *)port->buf[0].phys,
+                    (void *)&port->buf[0].phys,
+                    (void *)port->buf[0].client,
+                    (void *)port->buf[0].handle);
 #else
-		pr_debug("%s:data[%p]phys[%p][%p] mem_buffer[%p]\n",
-			__func__,
-			(void *)port->buf[0].data,
-			(void *)port->buf[0].phys,
-			(void *)&port->buf[0].phys,
-			(void *)port->buf[0].mem_buffer);
-		if (IS_ERR((void *)port->buf[0].mem_buffer))
-			pr_err("%s:mem buffer invalid, error = %ld\n",
-				 __func__,
-				PTR_ERR((void *)port->buf[0].mem_buffer));
-		else {
-			if (iounmap(
-				port->buf[0].mem_buffer) < 0)
-				pr_err("%s: unmap buffer failed\n", __func__);
-		}
-		free_contiguous_memory_by_paddr(port->buf[0].phys);
+            pr_debug("%s:data[%p]phys[%p][%p] mem_buffer[%p]\n",
+                    __func__,
+                    (void *)port->buf[0].data,
+                    (void *)port->buf[0].phys,
+                    (void *)&port->buf[0].phys,
+                    (void *)port->buf[0].mem_buffer);
+            if (IS_ERR((void *)port->buf[0].mem_buffer))
+                pr_err("%s:mem buffer invalid, error = %ld\n",
+                        __func__,
+                        PTR_ERR((void *)port->buf[0].mem_buffer));
+            else {
+                if (iounmap(
+                            port->buf[0].mem_buffer) < 0)
+                    pr_err("%s: unmap buffer failed\n", __func__);
+            }
+            free_contiguous_memory_by_paddr(port->buf[0].phys);
 #endif
-	}
+        }
 
-	while (cnt >= 0) {
-		port->buf[cnt].data = NULL;
-		port->buf[cnt].phys = 0;
-		cnt--;
-	}
-	port->max_buf_cnt = 0;
-	kfree(port->buf);
-	port->buf = NULL;
-	mutex_unlock(&ac->cmd_lock);
+        while (cnt >= 0) {
+            port->buf[cnt].data = NULL;
+            port->buf[cnt].phys = 0;
+            cnt--;
+        }
+        port->max_buf_cnt = 0;
+        kfree(port->buf);
+        port->buf = NULL;
+        mutex_unlock(&ac->cmd_lock);
 	return 0;
 }
 
@@ -658,74 +658,74 @@ int q6asm_audio_client_buf_alloc_contiguous(unsigned int dir,
 		pr_debug("%s: buffer already allocated\n", __func__);
 		return 0;
 	}
-	mutex_lock(&ac->cmd_lock);
-	buf = kzalloc(((sizeof(struct audio_buffer))*bufcnt),
-			GFP_KERNEL);
+        mutex_lock(&ac->cmd_lock);
+        buf = kzalloc(((sizeof(struct audio_buffer))*bufcnt),
+                GFP_KERNEL);
 
-	if (!buf) {
-		mutex_unlock(&ac->cmd_lock);
-		goto fail;
-	}
+        if (!buf) {
+            mutex_unlock(&ac->cmd_lock);
+            goto fail;
+        }
 
-	ac->port[dir].buf = buf;
+        ac->port[dir].buf = buf;
 
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
-	buf[0].client = msm_ion_client_create(UINT_MAX, "audio_client");
-	if (IS_ERR_OR_NULL((void *)buf[0].client)) {
-		pr_err("%s: ION create client for AUDIO failed\n", __func__);
-		mutex_unlock(&ac->cmd_lock);
-		goto fail;
-	}
-	buf[0].handle = ion_alloc(buf[0].client, bufsz * bufcnt, SZ_4K,
-				  (0x1 << ION_AUDIO_HEAP_ID), 0);
-	if (IS_ERR_OR_NULL((void *) buf[0].handle)) {
-		pr_err("%s: ION memory allocation for AUDIO failed\n",
-			__func__);
-		mutex_unlock(&ac->cmd_lock);
-		goto fail;
-	}
+        buf[0].client = msm_ion_client_create(UINT_MAX, "audio_client");
+        if (IS_ERR_OR_NULL((void *)buf[0].client)) {
+            pr_err("%s: ION create client for AUDIO failed\n", __func__);
+            mutex_unlock(&ac->cmd_lock);
+            goto fail;
+        }
+        buf[0].handle = ion_alloc(buf[0].client, bufsz * bufcnt, SZ_4K,
+                (0x1 << ION_AUDIO_HEAP_ID),0);
+        if (IS_ERR_OR_NULL((void *) buf[0].handle)) {
+            pr_err("%s: ION memory allocation for AUDIO failed\n",
+                    __func__);
+            mutex_unlock(&ac->cmd_lock);
+            goto fail;
+        }
 
-	rc = ion_phys(buf[0].client, buf[0].handle,
-		  (ion_phys_addr_t *)&buf[0].phys, (size_t *)&len);
-	if (rc) {
-		pr_err("%s: ION Get Physical for AUDIO failed, rc = %d\n",
-			__func__, rc);
-		mutex_unlock(&ac->cmd_lock);
-		goto fail;
-	}
+        rc = ion_phys(buf[0].client, buf[0].handle,
+                (ion_phys_addr_t *)&buf[0].phys, (size_t *)&len);
+        if (rc) {
+            pr_err("%s: ION Get Physical for AUDIO failed, rc = %d\n",
+                    __func__, rc);
+            mutex_unlock(&ac->cmd_lock);
+            goto fail;
+        }
 
-	buf[0].data = ion_map_kernel(buf[0].client, buf[0].handle);
-	if (IS_ERR_OR_NULL((void *) buf[0].data)) {
-		pr_err("%s: ION memory mapping for AUDIO failed\n", __func__);
-		mutex_unlock(&ac->cmd_lock);
-		goto fail;
-	}
-	memset((void *)buf[0].data, 0, (bufsz * bufcnt));
+        buf[0].data = ion_map_kernel(buf[0].client, buf[0].handle);
+        if (IS_ERR_OR_NULL((void *) buf[0].data)) {
+            pr_err("%s: ION memory mapping for AUDIO failed\n", __func__);
+            mutex_unlock(&ac->cmd_lock);
+            goto fail;
+        }
+        memset((void *)buf[0].data, 0, (bufsz * bufcnt));
 #else
-	buf[0].phys = allocate_contiguous_ebi_nomap(bufsz * bufcnt,
-						SZ_4K);
-	if (!buf[0].phys) {
-		pr_err("%s:Buf alloc failed size=%d, bufcnt=%d\n",
-		 __func__, bufsz, bufcnt);
-		mutex_unlock(&ac->cmd_lock);
-		goto fail;
-	}
+        buf[0].phys = allocate_contiguous_ebi_nomap(bufsz * bufcnt,
+                SZ_4K);
+        if (!buf[0].phys) {
+            pr_err("%s:Buf alloc failed size=%d, bufcnt=%d\n",
+                    __func__, bufsz, bufcnt);
+            mutex_unlock(&ac->cmd_lock);
+            goto fail;
+        }
 
-	buf[0].mem_buffer = ioremap(buf[0].phys, bufsz * bufcnt);
-	if (IS_ERR((void *)buf[cnt].mem_buffer)) {
-		pr_err("%s:map_buffer failed, error = %ld\n",
-			__func__, PTR_ERR((void *)buf[0].mem_buffer));
+        buf[0].mem_buffer = ioremap(buf[0].phys, bufsz * bufcnt);
+        if (IS_ERR((void *)buf[cnt].mem_buffer)) {
+            pr_err("%s:map_buffer failed, error = %ld\n",
+                    __func__, PTR_ERR((void *)buf[0].mem_buffer));
 
-		mutex_unlock(&ac->cmd_lock);
-		goto fail;
-	}
-	buf[0].data = buf[0].mem_buffer;
+            mutex_unlock(&ac->cmd_lock);
+            goto fail;
+        }
+        buf[0].data = buf[0].mem_buffer;
 #endif
-	if (!buf[0].data) {
-		pr_err("%s:invalid vaddr, iomap failed\n", __func__);
-		mutex_unlock(&ac->cmd_lock);
-		goto fail;
-	}
+        if (!buf[0].data) {
+            pr_err("%s:invalid vaddr, iomap failed\n", __func__);
+            mutex_unlock(&ac->cmd_lock);
+            goto fail;
+        }
 
 	buf[0].used = dir ^ 1;
 	buf[0].size = bufsz;
@@ -3164,7 +3164,53 @@ fail_cmd:
 	kfree(vol_cmd);
 	return rc;
 }
+//                                                 
+int q6asm_set_volume_nosync(struct audio_client *ac, int volume)
+{
+	void *vol_cmd = NULL;
+	void *payload = NULL;
+	struct asm_pp_params_command *cmd = NULL;
+	struct asm_master_gain_params *mgain = NULL;
+	int sz = 0;
+	int rc  = 0;
 
+	sz = sizeof(struct asm_pp_params_command) +
+		+ sizeof(struct asm_master_gain_params);
+	vol_cmd = kzalloc(sz, GFP_KERNEL);
+	if (vol_cmd == NULL) {
+		pr_err("%s[%d]: Mem alloc failed\n", __func__, ac->session);
+		rc = -EINVAL;
+		return rc;
+	}
+	cmd = (struct asm_pp_params_command *)vol_cmd;
+	q6asm_add_hdr_async(ac, &cmd->hdr, sz, TRUE);
+	cmd->hdr.opcode = ASM_STREAM_CMD_SET_PP_PARAMS;
+	cmd->payload = NULL;
+	cmd->payload_size = sizeof(struct  asm_pp_param_data_hdr) +
+				sizeof(struct asm_master_gain_params);
+	cmd->params.module_id = VOLUME_CONTROL_MODULE_ID;
+	cmd->params.param_id = MASTER_GAIN_PARAM_ID;
+	cmd->params.param_size = sizeof(struct asm_master_gain_params);
+	cmd->params.reserved = 0;
+
+	payload = (u8 *)(vol_cmd + sizeof(struct asm_pp_params_command));
+	mgain = (struct asm_master_gain_params *)payload;
+
+	mgain->master_gain = volume;
+	mgain->padding = 0x00;
+	rc = apr_send_pkt(ac->apr, (uint32_t *) vol_cmd);
+	if (rc < 0) {
+		pr_err("%s: Volume Command failed\n", __func__);
+		rc = -EINVAL;
+		goto fail_cmd;
+	}
+	
+
+fail_cmd:
+	kfree(vol_cmd);
+	return rc;
+}
+//                                                 
 int q6asm_set_volume(struct audio_client *ac, int volume)
 {
 	void *vol_cmd = NULL;
@@ -4033,15 +4079,35 @@ static int __init q6asm_init(void)
 	memset(session, 0, sizeof(session));
 #ifdef CONFIG_DEBUG_FS
 	out_buffer = kmalloc(OUT_BUFFER_SIZE, GFP_KERNEL);
+#ifdef CONFIG_LGE_AUDIO
+	/*
+                                                              
+                               
+  */
+	out_dentry = debugfs_create_file("audio_out_latency_measurement_node",\
+				S_IFREG | S_IRUGO | S_IWUSR | S_IWGRP,\
+				NULL, NULL, &audio_output_latency_debug_fops);
+#else
 	out_dentry = debugfs_create_file("audio_out_latency_measurement_node",\
 				0664,\
 				NULL, NULL, &audio_output_latency_debug_fops);
+#endif
 	if (IS_ERR(out_dentry))
 		pr_err("debugfs_create_file failed\n");
 	in_buffer = kmalloc(IN_BUFFER_SIZE, GFP_KERNEL);
+#ifdef CONFIG_LGE_AUDIO
+	/*
+                                                              
+                               
+  */
+	in_dentry = debugfs_create_file("audio_in_latency_measurement_node",\
+				S_IFREG | S_IRUGO | S_IWUSR | S_IWGRP,\
+				NULL, NULL, &audio_input_latency_debug_fops);
+#else
 	in_dentry = debugfs_create_file("audio_in_latency_measurement_node",\
 				0664,\
 				NULL, NULL, &audio_input_latency_debug_fops);
+#endif
 	if (IS_ERR(in_dentry))
 		pr_err("debugfs_create_file failed\n");
 #endif

@@ -365,12 +365,12 @@ static int msm_pcm_open(struct snd_pcm_substream *substream)
 	struct asm_softpause_params softpause = {
 		.enable = SOFT_PAUSE_ENABLE,
 		.period = SOFT_PAUSE_PERIOD,
-		.step = SOFT_PAUSE_STEP,
+		.step = 0, // SOFT_PAUSE_STEP,    //myungwon.kim, Remove Residual Noise When LPA Play is Resumed
 		.rampingcurve = SOFT_PAUSE_CURVE_LINEAR,
 	};
 	struct asm_softvolume_params softvol = {
 		.period = SOFT_VOLUME_PERIOD,
-		.step = SOFT_VOLUME_STEP,
+		.step = 0, // SOFT_VOLUME_STEP,   //myungwon.kim, Remove Residual Noise When LPA Play is Resumed
 		.rampingcurve = SOFT_VOLUME_CURVE_LINEAR,
 	};
 	int ret = 0;
@@ -491,17 +491,18 @@ static int msm_pcm_playback_close(struct snd_pcm_substream *substream)
 		prtd->pcm_irq_pos = 0;
 	}
 
+
 	dir = IN;
 	atomic_set(&prtd->pending_buffer, 0);
 	lpa_audio.prtd = NULL;
 	q6asm_cmd(prtd->audio_client, CMD_CLOSE);
 	q6asm_audio_client_buf_free_contiguous(dir,
-				prtd->audio_client);
-
+					prtd->audio_client);
 	atomic_set(&prtd->stop, 1);
+
 	pr_debug("%s\n", __func__);
 	msm_pcm_routing_dereg_phy_stream(soc_prtd->dai_link->be_id,
-		SNDRV_PCM_STREAM_PLAYBACK);
+			SNDRV_PCM_STREAM_PLAYBACK);
 	pr_debug("%s\n", __func__);
 	q6asm_audio_client_free(prtd->audio_client);
 	prtd->meta_data_mode = false;

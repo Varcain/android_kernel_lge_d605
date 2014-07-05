@@ -1132,11 +1132,122 @@ config USB_ANDROID_RMNET_CTRL_SMD
 	 transfers. This option enables only control interface.
 	 Data interface used is BAM.
 
+# LGE_CHANGE
+# LGE android gadget config for JB.
+# Toward simple, straightforward...
+# 2012-09-09, sungho.jung@lge.com
+#
+config USB_LGE_ANDROID
+	boolean "LGE Android Gadget for LG PC host Driver"
+	depends on USB_G_ANDROID
+	help
+	  Customized Android Gadget USB framework for
+	  LGE United PC host USB driver.
+
+	default n
+
 config USB_ANDROID_CDC_ECM
 	boolean "Android Gadget support CDC ECM"
 	depends on USB_G_ANDROID
 	default n
 	help
 	  Android Gadget USB support CDC ECM instead of RNDIS
+
+config USB_LGE_ANDROID_PFSC
+	boolean "Force full speed support if pif is connected in LGE Android"
+	depends on USB_LGE_ANDROID
+	help
+	   This feature is that USB set forcely full speed if pif cable is
+	   connected. It is only for PIF cable, not normal USB cable.
+
+	   Say y if this must be needed.
+
+	default n
+
+config USB_LGE_ANDROID_STORAGE_NAME
+	string "USB mass & cdrom storage device name for LGE Android"
+	depends on USB_LGE_ANDROID
+	default "Android Platform"
+	help
+	   Name for USB mass & cdrom device name used in LGE Andoird Autorun.
+
+	   NOTE: default name is "Android Platform", need to change your
+	   board config to use other device name(e.g. in VZW devices)
+
+config USB_LGE_ANDROID_AUTORUN
+	boolean "Common autorun support in LGE Android"
+	depends on USB_LGE_ANDROID
+	help
+	  Autorun is LGE specific feature which is able to install PC host
+	  USB driver automatically on Autorun-enabled OS(Ex. Windows). For this,
+	  virtual-cdrom device is provided on LGE Android powered device.
+
+	default n
+
+config USB_LGE_ANDROID_AUTORUN_VZW
+	boolean "VZW specific autorun support in LGE Android"
+	depends on USB_LGE_ANDROID_AUTORUN
+	help
+	  It supports VZW specific autorun feature. note that this
+	  must be used in VZW devices.
+
+	  Say y if this must be needed.
+
+	default n
+
+config USB_LGE_ANDROID_AUTORUN_LGE
+	boolean "LGE specific autorun support in LGE Android"
+	depends on USB_LGE_ANDROID_AUTORUN
+	help
+	  It supports LGE specific autorun feature. note that this
+	  must be used in LGE(with non-VZW) devices.
+
+	  Say y if this must be needed.
+
+	default n
+
+config USB_LGE_ANDROID_CDROM_MAC_SUPPORT
+	boolean "USB CDROM support patch of LGE Android on Mac OS-X"
+	depends on USB_LGE_ANDROID
+	help
+	  This feature is based on Roger Quadros' patch as following;
+
+	  - usb:gadget:storage: Make CD-ROM emulation work with Mac OS-X
+	  - usb:gadget:f_mass_storage: Make CD-ROM emulation work with Mac OS-X
+
+	  ref: https://lkml.org/lkml/2011/4/5/190
+
+	  - Here is comment of committer:
+
+	  Mac OS-X expects CD-ROM TOC in raw format (i.e. format:2). It also
+	  sends the READ_TOC CDB in old style SFF8020i format. i.e. 2 format bits
+	  are encoded in MSBs of CDB byte 9.
+
+	  The first patch introduces a fsg_get_toc() helper which builds the
+	  Table of Contents (TOC) that can be used for the READ_TOC command.
+	  The remaining two patches simply make file_storage gadget and mass_storage
+	  gadget use the new helper function.
+
+	  Say y if this feature must be used.
+
+	default n
+
+config USB_LGE_ANDROID_DIAG_OSP_SUPPORT
+	boolean "On Screen Phone patch for reducing packet loss on Diag"
+	depends on USB_LGE_ANDROID
+	help
+	 LG OSP(On Screen Phone) communicate by diag port in Qualcomm based model.
+	 But Diag port can't fully transmit OSP's packets, it often discard OSP packets
+	 when diagchar_read is operated continuously.
+	 This problem occur for only OSP packets, because OSP is implemented that
+	 OSP server and client can simultaneously transfer request/reply each other.
+	 Finally, this is read timing issue between usb and diag layer.
+
+	 Fix the issue using synchronization of read operation between usb and diag.
+	 This feature will be used in only Qualcomm based OSP supporting model.
+
+	 Say y if this must be needed.
+
+	default n
 
 endif # USB_GADGET

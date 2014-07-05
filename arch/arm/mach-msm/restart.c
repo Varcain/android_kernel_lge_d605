@@ -35,6 +35,10 @@
 #include "msm_watchdog.h"
 #include "timer.h"
 
+#ifdef CONFIG_LGE_HIDDEN_RESET
+#include <mach/board_lge.h>
+#endif
+
 #define WDT0_RST	0x38
 #define WDT0_EN		0x40
 #define WDT0_BARK_TIME	0x4C
@@ -48,10 +52,15 @@
 #define SCM_IO_DISABLE_PMIC_ARBITER	1
 
 #ifdef CONFIG_LGE_CRASH_HANDLER
-#define LGE_ERROR_HANDLER_MAGIC_NUM	0xA97F2C46
-#define LGE_ERROR_HANDLER_MAGIC_ADDR	0x18
-void *lge_error_handler_cookie_addr;
-static int ssr_magic_number = 0;
+/* 
+                                     
+ */
+#define LGE_ERROR_HANDLE_MAGIC_NUM        0xA97F2C46
+/*
+ * Need to check offset address in SBL3 (struct boot_shared_imem_cookie_type)
+ */
+#define LGE_ERROR_HANDLE_MAGIC_ADDR     0x14
+void *lge_error_handle_cookie_addr;
 #endif
 
 static int restart_mode;
@@ -84,12 +93,21 @@ static struct notifier_block panic_blk = {
 static void set_dload_mode(int on)
 {
 	if (dload_mode_addr) {
+#ifdef CONFIG_LGE_HIDDEN_RESET
+		/* If dload magic is set, rpm booting is skipped by bootloader
+		 * Thus, skip dload magic during hreset_enable
+		 */
+		if (on && hreset_enable && restart_mode != RESTART_DLOAD)
+			goto skip_dload_magic;
+#endif
 		__raw_writel(on ? 0xE47B337D : 0, dload_mode_addr);
 		__raw_writel(on ? 0xCE14091A : 0,
 		       dload_mode_addr + sizeof(unsigned int));
+#ifdef CONFIG_LGE_HIDDEN_RESET
+skip_dload_magic:
+#endif
 #ifdef CONFIG_LGE_CRASH_HANDLER
-		__raw_writel(on ? LGE_ERROR_HANDLER_MAGIC_NUM : 0,
-				lge_error_handler_cookie_addr);
+		__raw_writel(on ? LGE_ERROR_HANDLE_MAGIC_NUM : 0,  lge_error_handle_cookie_addr);
 #endif
 		mb();
 	}
@@ -112,10 +130,6 @@ static int dload_set(const char *val, struct kernel_param *kp)
 	}
 
 	set_dload_mode(download_mode);
-#ifdef CONFIG_LGE_CRASH_HANDLER
-	ssr_magic_number = 0;
-#endif
-
 	return 0;
 }
 #else
@@ -125,10 +139,6 @@ static int dload_set(const char *val, struct kernel_param *kp)
 void msm_set_restart_mode(int mode)
 {
 	restart_mode = mode;
-#ifdef CONFIG_LGE_CRASH_HANDLER
-	if (download_mode == 1 && (mode & 0xFFFF0000) == 0x6D630000)
-		panic("LGE crash handler detected panic");
-#endif
 }
 EXPORT_SYMBOL(msm_set_restart_mode);
 
@@ -194,43 +204,36 @@ static irqreturn_t resout_irq_handler(int irq, void *dev_id)
 		;
 	return IRQ_HANDLED;
 }
-
 #ifdef CONFIG_LGE_CRASH_HANDLER
-#define SUBSYS_NAME_MAX_LENGTH	40
+static int subsys_crash_magic=0;
+#define SUBSYS_NAME_MAX_LENGTH 40
 
-int get_ssr_magic_number(void)
+int lge_get_magic_for_subsystem(void)
 {
-	return ssr_magic_number;
+	return subsys_crash_magic;
 }
 
-void set_ssr_magic_number(const char* subsys_name)
+void lge_set_magic_for_subsystem(const char* subsys_name)
 {
+        const char *crash_subsys[] = {"modem","riva","dsps","lpass",};
 	int i;
-	const char *subsys_list[] = {
-		"modem", "riva", "dsps", "lpass",
-		"external_modem", "gss",
-	};
 
-	ssr_magic_number = (0x6d630000 | 0x0000f000);
-
-	for (i=0; i < ARRAY_SIZE(subsys_list); i++) {
-		if (!strncmp(subsys_list[i], subsys_name,
-					SUBSYS_NAME_MAX_LENGTH)) {
-			ssr_magic_number = (0x6d630000 | ((i+1)<<12));
+	for(i=0;i<ARRAY_SIZE(crash_subsys);i++){
+		if(!strncmp(crash_subsys[i],subsys_name,SUBSYS_NAME_MAX_LENGTH)){
+			subsys_crash_magic = (0x6d630000 |((i+1)<<12));
 			break;
 		}
 	}
 }
 
-void set_kernel_crash_magic_number(void)
+void lge_set_kernel_crash_magic(void)
 {
-	pet_watchdog();
-	if (ssr_magic_number == 0)
+	if(subsys_crash_magic==0)
 		__raw_writel(0x6d630100, restart_reason);
 	else
 		__raw_writel(restart_mode, restart_reason);
 }
-#endif /* CONFIG_LGE_CRASH_HANDLER */
+#endif
 
 void msm_restart(char mode, const char *cmd)
 {
@@ -247,8 +250,9 @@ void msm_restart(char mode, const char *cmd)
 	if (restart_mode == RESTART_DLOAD) {
 		set_dload_mode(1);
 #ifdef CONFIG_LGE_CRASH_HANDLER
-		writel(0x6d63c421, restart_reason);
-		goto reset;
+// replace to lge_set_kernel_crash_magic()
+        writel(0x6d63c421, restart_reason);
+        goto reset;
 #endif
 	}
 
@@ -261,6 +265,43 @@ void msm_restart(char mode, const char *cmd)
 
 	pm8xxx_reset_pwr_off(1);
 
+/*            */
+#ifdef CONFIG_LGE_CRASH_HANDLER
+	if(in_panic==1) {
+		lge_set_kernel_crash_magic();
+	} else {
+		if (cmd != NULL) {
+			if (!strncmp(cmd, "bootloader", 10)) {
+				__raw_writel(0x77665500, restart_reason);
+			} else if (!strncmp(cmd, "recovery", 8)) {
+				__raw_writel(0x77665502, restart_reason);
+				/* PC Sync B&R : Add restart reason */
+				} else if (!strncmp(cmd, "--bnr_recovery", 14)) {
+				//                                                                             
+					__raw_writel(0x77665503, restart_reason);
+				//                                                                             
+			} else if (!strncmp(cmd, "oem-", 4)) {
+				unsigned long code;
+				code = simple_strtoul(cmd + 4, NULL, 16) & 0xff;
+				__raw_writel(0x6f656d00 | code, restart_reason);
+#ifdef CONFIG_LGE_CHARGER_TEMP_SCENARIO
+				/*                                                   
+                                      
+     */
+				} else if (!strncmp(cmd, "battery", 7)) {
+					__raw_writel(0x77665510, restart_reason);
+#endif
+			} else {
+				__raw_writel(0x77665501, restart_reason);
+			}
+		} else {
+			__raw_writel(0x77665501, restart_reason);
+		}
+	}
+
+reset:
+	
+#else /* QCT Original */
 	if (cmd != NULL) {
 		if (!strncmp(cmd, "bootloader", 10)) {
 			__raw_writel(0x77665500, restart_reason);
@@ -276,12 +317,7 @@ void msm_restart(char mode, const char *cmd)
 	} else {
 		__raw_writel(0x77665501, restart_reason);
 	}
-#ifdef CONFIG_LGE_CRASH_HANDLER
-	if (in_panic == 1)
-		set_kernel_crash_magic_number();
-reset:
-#endif /* CONFIG_LGE_CRASH_HANDLER */
-
+#endif
 	__raw_writel(0, msm_tmr0_base + WDT0_EN);
 	if (!(machine_is_msm8x60_fusion() || machine_is_msm8x60_fusn_ffa())) {
 		mb();
@@ -313,10 +349,6 @@ static int __init msm_pmic_restart_init(void)
 		pr_warn("no pmic restart interrupt specified\n");
 	}
 
-#ifdef CONFIG_LGE_CRASH_HANDLER
-	__raw_writel(0x6d63ad00, restart_reason);
-#endif
-
 	return 0;
 }
 
@@ -328,8 +360,7 @@ static int __init msm_restart_init(void)
 	atomic_notifier_chain_register(&panic_notifier_list, &panic_blk);
 	dload_mode_addr = MSM_IMEM_BASE + DLOAD_MODE_ADDR;
 #ifdef CONFIG_LGE_CRASH_HANDLER
-	lge_error_handler_cookie_addr = MSM_IMEM_BASE +
-		LGE_ERROR_HANDLER_MAGIC_ADDR;
+	lge_error_handle_cookie_addr = MSM_IMEM_BASE + LGE_ERROR_HANDLE_MAGIC_ADDR;
 #endif
 	set_dload_mode(download_mode);
 #endif
@@ -337,6 +368,9 @@ static int __init msm_restart_init(void)
 	restart_reason = MSM_IMEM_BASE + RESTART_REASON_ADDR;
 	pm_power_off = msm_power_off;
 
+#ifdef CONFIG_LGE_CRASH_HANDLER
+	__raw_writel(0x6d63ad00, restart_reason);
+#endif
 	return 0;
 }
 early_initcall(msm_restart_init);

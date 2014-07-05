@@ -873,7 +873,11 @@ static const char recursion_bug_msg [] =
 		KERN_CRIT "BUG: recent printk recursion!\n";
 static int recursion_bug;
 static int new_text_line = 1;
+#ifdef CONFIG_MACH_LGE
+static char printk_buf[2048];
+#else
 static char printk_buf[1024];
+#endif
 
 int printk_delay_msec __read_mostly;
 
@@ -986,6 +990,31 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 			}
 
 			if (printk_time) {
+#if defined(CONFIG_MACH_LGE)
+				/* Add the current time stamp */
+				static char tbuf[256], *tp;
+				unsigned tlen;
+				unsigned long long t;
+				unsigned long nanosec_rem;
+				static struct timespec time;
+				static struct tm tmresult;
+
+				time = __current_kernel_time();
+				time_to_tm(time.tv_sec, sys_tz.tz_minuteswest * 60 * (-1), &tmresult);
+
+                                t = cpu_clock(printk_cpu);
+                                nanosec_rem = do_div(t, 1000000000);
+
+				tlen = sprintf(tbuf, "[%5lu.%06lu %02d-%02d %02d:%02d:%02d.%03lu] ",
+										(unsigned long) t,
+				                                                nanosec_rem / 1000,
+								tmresult.tm_mon + 1,
+								tmresult.tm_mday,
+								tmresult.tm_hour,
+								tmresult.tm_min,
+								tmresult.tm_sec,
+								(unsigned long) time.tv_nsec / 1000000);
+#else
 				/* Add the current time stamp */
 				char tbuf[50], *tp;
 				unsigned tlen;
@@ -997,6 +1026,7 @@ asmlinkage int vprintk(const char *fmt, va_list args)
 				tlen = sprintf(tbuf, "[%5lu.%06lu] ",
 						(unsigned long) t,
 						nanosec_rem / 1000);
+#endif
 
 				for (tp = tbuf; tp < tbuf + tlen; tp++)
 					emit_log_char(*tp);

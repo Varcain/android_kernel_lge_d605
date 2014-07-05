@@ -58,6 +58,10 @@ struct msm_actuator_func_tbl {
 			struct damping_params_t *,
 			int8_t,
 			int16_t);
+	/*                                                                                   */
+	int32_t (*actuator_move_focus_manual) (struct msm_actuator_ctrl_t *,
+			struct msm_actuator_move_params_t *);
+	/*                                                                                   */
 };
 
 struct msm_actuator {
@@ -77,6 +81,9 @@ struct msm_actuator_ctrl_t {
 	int16_t curr_step_pos;
 	uint16_t curr_region_index;
 	uint16_t *step_position_table;
+	/*                                                                                   */
+	uint16_t *step_position_table_manual;
+	/*                                                                                   */
 	struct region_params_t region_params[MAX_ACTUATOR_REGION];
 	uint16_t reg_tbl_size;
 	struct msm_actuator_reg_params_t reg_tbl[MAX_ACTUATOR_REG_TBL_SIZE];

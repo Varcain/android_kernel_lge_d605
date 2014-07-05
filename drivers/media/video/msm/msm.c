@@ -964,11 +964,19 @@ static int msm_open(struct file *f)
 			goto msm_cam_server_get_mctl_failed;
 		}
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+/*                                                                  */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+		pmctl->client = msm_camera_v4l2_get_ion_client(pcam);
+		if(pmctl->client != NULL)
+			ion_client_created = 1;
+#else
 		if (!pmctl->client) {
 			pmctl->client = msm_ion_client_create(-1, "camera");
 			kref_init(&pmctl->refcount);
 		}
 		ion_client_created = 1;
+#endif
+/*                                                                */
 #endif
 
 		/* Should be set to sensor ops if any but right now its OK!! */
@@ -987,11 +995,26 @@ static int msm_open(struct file *f)
 		}
 		pmctl->pcam_ptr = pcam;
 
+/*                                                                                   */    
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+#else
 		msm_setup_v4l2_event_queue(&pcam_inst->eventHandle,
 			pcam->pvdev);
+#endif
+/*                                                                                   */    
 		mutex_init(&pcam->event_lock);
 		msm_queue_init(&pcam->eventData_q, "eventData");
 	}
+  
+/*                                                                                   */     
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+   if (pcam_inst->my_index == 0) {
+       msm_setup_v4l2_event_queue(&pcam_inst->eventHandle,
+       pcam->pvdev);
+    }
+#endif
+/*                                                                                   */    
+
 	pcam_inst->vbqueue_initialized = 0;
 	pcam_inst->sequence = 0;
 	pcam_inst->avtimerOn = 0;
@@ -1024,10 +1047,17 @@ msm_send_open_server_failed:
 	}
 mctl_open_failed:
 #ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+/*                                                                  */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+		if(ion_client_created == 1)
+			msm_camera_v4l2_put_ion_client(pcam);
+#else
 	if (ion_client_created) {
 		D("%s: destroy ion client", __func__);
 		kref_put(&pmctl->refcount, msm_release_ion_client);
 	}
+#endif
+/*                                                                */
 #endif
 msm_cam_server_get_mctl_failed:
 	if (msm_server_end_session(pcam) < 0)
@@ -1145,26 +1175,52 @@ static int msm_close(struct file *f)
 	if (pcam_inst->streamon) {
 		/*something went wrong since instance
 		is closing without streamoff*/
+//                                                                     
+		printk("%s OO pcam_inst->streamon \n",__func__);
+//                                                                     
+		//                                                                                          
+/*                                                                                   */    
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+#else
 		if (pmctl->mctl_release)
 			pmctl->mctl_release(pmctl);
 		pmctl->mctl_release = NULL;/*so that it isn't closed again*/
+#endif
+/*                                                                                   */    
+		//                                                                                        
+//                                                                     
+	}
+	else
+	{
+		printk("%s XX pcam_inst->streamon \n",__func__);
+//                                                                     
 	}
 
 	pcam_inst->streamon = 0;
 	pcam_inst->avtimerOn = 0;
 	pcam->use_count--;
 	pcam->dev_inst_map[pcam_inst->image_mode] = NULL;
+/*                                                               */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GK_KR) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+	pcam_inst->is_closing = 1;
+#endif
+/*                                                             */
 	if (pcam_inst->vbqueue_initialized)
 		vb2_queue_release(&pcam_inst->vid_bufq);
-	D("%s Closing down instance %p ", __func__, pcam_inst);
-	D("%s index %d nodeid %d count %d\n", __func__, pcam_inst->my_index,
+	pr_err("%s Closing down instance %p ", __func__, pcam_inst);
+	pr_err("%s index %d nodeid %d count %d\n", __func__, pcam_inst->my_index,
 		pcam->vnode_id, pcam->use_count);
 	pcam->dev_inst[pcam_inst->my_index] = NULL;
 	if (pcam_inst->my_index == 0) {
 		mutex_lock(&pcam->event_lock);
 		msm_drain_eventq(&pcam->eventData_q);
 		mutex_unlock(&pcam->event_lock);
+/*                                                                                   */    
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+#else
 		mutex_destroy(&pcam->event_lock);
+#endif
+/*                                                                                   */    
 		msm_destroy_v4l2_event_queue(&pcam_inst->eventHandle);
 	}
 
@@ -1177,13 +1233,28 @@ static int msm_close(struct file *f)
 	f->private_data = NULL;
 
 	if (pcam->use_count == 0) {
+
+/*                                                                  */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+		msm_camera_v4l2_put_ion_client(pcam);
+#endif
+#endif
+/*                                                                */
+
 		if (msm_server_get_usecount() > 0) {
 			rc = msm_send_close_server(pcam);
 			if (rc < 0)
 				pr_err("msm_send_close_server failed %d\n", rc);
 		}
 
+/*                                                                  */
+#if 1
+		if (pmctl != NULL && pmctl->mctl_release) {
+#else	//QMC Original
 		if (pmctl->mctl_release) {
+#endif
+/*                                                                */
 			pmctl->mctl_release(pmctl);
 			pmctl->mctl_release = NULL;
 		}
@@ -1194,6 +1265,11 @@ static int msm_close(struct file *f)
 		rc = msm_server_end_session(pcam);
 		if (rc < 0)
 			pr_err("msm_server_end_session fails %d\n", rc);
+ /*                                                                                   */    
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GKKT) || defined(CONFIG_MACH_APQ8064_GKSK) || defined(CONFIG_MACH_APQ8064_GKU) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+          mutex_destroy(&pcam->event_lock);
+#endif
+/*                                                                                   */    
 	}
 	mutex_unlock(&pcam->vid_lock);
 	return rc;
@@ -1257,17 +1333,26 @@ long msm_v4l2_evt_notify(struct msm_cam_media_controller *mctl,
 	}
 	ktime_get_ts(&v4l2_ev.timestamp);
 	if (evt_payload.payload_length > 0 && evt_payload.payload != NULL) {
+//                                                             
+		pr_err(" %s : payload_length %d \n",__func__,evt_payload.payload_length);
+//                                                            
 		mutex_lock(&pcam->event_lock);
 		event_qcmd = kzalloc(sizeof(struct msm_queue_cmd), GFP_KERNEL);
 		if (!event_qcmd) {
 			pr_err("%s Insufficient memory. return", __func__);
 			rc = -ENOMEM;
+//                                                              
+			mutex_unlock(&pcam->event_lock);
+//                                                             
 			goto event_qcmd_alloc_fail;
 		}
 		payload = kzalloc(evt_payload.payload_length, GFP_KERNEL);
 		if (!payload) {
 			pr_err("%s Insufficient memory. return", __func__);
 			rc = -ENOMEM;
+//                                                              
+			mutex_unlock(&pcam->event_lock);
+//                                                             
 			goto payload_alloc_fail;
 		}
 		if (copy_from_user(payload,
@@ -1467,6 +1552,74 @@ probe_fail:
 	return NULL;
 }
 
+/*                                                                  */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GK_KR) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+void msm_camera_v4l2_release_ion_client(struct kref *ref)
+{
+    struct msm_cam_v4l2_device *pcam = container_of(ref, struct msm_cam_v4l2_device, refcount);
+    struct ion_client * client = pcam->client;
+    pr_err("%s calling ion_client_destroy\n", __func__);
+    pcam->client = NULL;
+    spin_unlock(&pcam->ion_lock);
+    ion_client_destroy(client);
+    spin_lock(&pcam->ion_lock);
+}
+
+struct ion_client *msm_camera_v4l2_get_ion_client(struct msm_cam_v4l2_device *pcam)
+{
+	if (!pcam) {
+		pr_err("%s: pcam is null!\n",
+			__func__);
+		return NULL;
+	}
+
+    spin_lock(&pcam->ion_lock);
+
+    if(pcam->client == NULL)
+    {
+		struct ion_client *client;
+		spin_unlock(&pcam->ion_lock);
+        client = msm_ion_client_create(-1, "camera");
+        if (IS_ERR_OR_NULL(client))
+        {
+            pr_err("%s fail to create ion client\n", __func__);
+            return NULL;
+        }
+		spin_lock(&pcam->ion_lock);
+		pcam->client= client;
+        kref_init(&pcam->refcount);
+    }else
+        kref_get(&pcam->refcount);
+
+    spin_unlock(&pcam->ion_lock);
+    
+    return pcam->client;
+}
+
+int msm_camera_v4l2_put_ion_client(struct msm_cam_v4l2_device *pcam)
+{
+    if (!pcam) {
+    	pr_err("%s: pcam is null!\n",
+    		__func__);
+    	return -ENOMEM;
+    }
+    spin_lock(&pcam->ion_lock);
+    if(!pcam->client) {
+    	pr_err("%s: pcam's ion client is null!\n",
+    		__func__);
+		spin_unlock(&pcam->ion_lock);
+    	return -ENOMEM;
+    }
+    
+    kref_put(&pcam->refcount, msm_camera_v4l2_release_ion_client);
+    spin_unlock(&pcam->ion_lock);
+    return 0;
+}
+#endif
+#endif
+/*                                                                */
+
 /* register a msm sensor into the msm device, which will probe the
  * sensor HW. if the HW exist then create a video device (/dev/videoX/)
  * to represent this sensor */
@@ -1552,6 +1705,13 @@ int msm_sensor_register(struct v4l2_subdev *sensor_sd)
 	}
 
 	pcam->vnode_id = vnode_count++;
+/*                                                                  */
+#if defined(CONFIG_MACH_MSM8930_FX3) || defined(CONFIG_MACH_APQ8064_GK_KR) || defined(CONFIG_MACH_APQ8064_GKATT) || defined (CONFIG_MACH_APQ8064_GVDCM)
+#ifdef CONFIG_MSM_MULTIMEDIA_USE_ION
+    spin_lock_init(&pcam->ion_lock);
+#endif
+#endif
+/*                                                                */
 	return rc;
 
 failure:

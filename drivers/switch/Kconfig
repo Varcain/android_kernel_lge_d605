@@ -13,8 +13,17 @@ config SWITCH_GPIO
 	  Say Y here to enable GPIO based switch support.
 
 config SWITCH_FSA8008
-	bool "FSA8008 Headset detection driver"
+	tristate "LGE Headset detection driver(FSA8080)"
+	depends on MACH_LGE
+	default n
 	help
-	 Say Y here to enable FSA8008 driver
+	  Say Y here to enable GPIO based switch support.
+
+config LGE_AUDIO_MBHC_SDEV
+	tristate "Switch device driver headset detection(MBHC)"
+	depends on MACH_LGE
+	default n
+	help
+	  Say Y here to enable Switch device driver headset detection(MBHC)
 
 endif # SWITCH
