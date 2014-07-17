@@ -398,13 +398,15 @@ void hci_le_ltk_reply(struct hci_conn *conn, u8 ltk[16])
 {
 	struct hci_dev *hdev = conn->hdev;
 	struct hci_cp_le_ltk_reply cp;
+	size_t size = 0;
 
 	BT_DBG("%p", conn);
 
 	memset(&cp, 0, sizeof(cp));
 
 	cp.handle = cpu_to_le16(conn->handle);
-	memcpy(cp.ltk, ltk, sizeof(*ltk));
+	size = sizeof(ltk);
+	memcpy(cp.ltk, ltk, size);
 
 	hci_send_cmd(hdev, HCI_OP_LE_LTK_REPLY, sizeof(cp), &cp);
 }
